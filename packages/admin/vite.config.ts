@@ -16,7 +16,7 @@ export default defineConfig({
   server: {
     port: 5173,
     fs: {
-      allow: ['..', '../../test-frontend'],
+      allow: ['../..', '../../test-frontend'],
     },
     proxy: {
       '/api/': {
