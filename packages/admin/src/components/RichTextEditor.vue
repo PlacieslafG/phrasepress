@@ -1,7 +1,7 @@
 <template>
   <div class="border border-surface-200 rounded-lg overflow-hidden">
     <!-- Toolbar -->
-    <div class="flex flex-wrap items-center gap-0.5 p-1.5 border-b border-surface-200">
+    <div class="rte-toolbar flex flex-wrap items-center gap-0.5 p-1.5 border-b border-surface-200">
       <!-- Bold -->
       <button :class="tbBtn(editor?.isActive('bold'))" style="font-weight:700;font-family:serif"
         @click="editor?.chain().focus().toggleBold().run()">B</button>
@@ -80,8 +80,8 @@ function tbBtn(active: boolean | undefined) {
     'inline-flex items-center justify-center w-7 h-7 rounded text-sm transition-colors',
     'disabled:opacity-30 disabled:cursor-not-allowed',
     active
-      ? 'bg-primary-100 text-primary-700 dark:bg-primary-900/40 dark:text-primary-300'
-      : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700',
+      ? 'rte-btn-active'
+      : 'hover:bg-slate-100',
   ].join(' ')
 }
 
@@ -133,4 +133,10 @@ onBeforeUnmount(() => editor.value?.destroy())
 .ProseMirror a { color: #6366f1; text-decoration: underline; }
 .ProseMirror p { margin: 0.25rem 0; }
 .ProseMirror img { max-width: 100%; height: auto; border-radius: 0.375rem; margin: 0.5rem 0; }
+
+.rte-toolbar button { color: #334155; }
+.dark .rte-toolbar button { color: #cbd5e1; }
+.dark .rte-toolbar button:hover { background-color: #1e293b; }
+.rte-btn-active { background-color: #d1fae5; color: #065f46; }
+.dark .rte-btn-active { background-color: rgba(6,78,59,0.4); color: #6ee7b7; }
 </style>
