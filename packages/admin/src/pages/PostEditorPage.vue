@@ -166,6 +166,7 @@
 
           <TranslationEditor
             v-if="currentLocale"
+            :key="activeLocale"
             v-model="translationForm"
             :translatable-field-defs="translatableFieldDefs"
           />
@@ -177,7 +178,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onMounted } from 'vue'
+import { ref, computed, watch, watchEffect, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAppStore } from '@/stores/app.js'
 import { postsApi } from '@/api/posts.js'
@@ -375,6 +376,16 @@ function switchLocale(code: string) {
     : { title: form.value.title, slug: '', content: '', fields: {}, status: 'draft' }
 }
 
+// Safety net: keep translationForm in sync whenever activeLocale or translations change
+watchEffect(() => {
+  const code = activeLocale.value
+  if (!code) return
+  const t = translations.value.find(x => x.locale === code)
+  if (t) {
+    translationForm.value = { title: t.title, slug: t.slug, content: t.content, fields: { ...t.fields }, status: t.status }
+  }
+})
+
 async function loadI18n() {
   if (!appStore.isPluginActive('phrasepress-i18n') || !postId.value) return
   try {
@@ -443,31 +454,28 @@ async function autoTranslateCurrent() {
 async function translateAll() {
   if (!postId.value || locales.value.length === 0) return
   translatingAll.value = true
-  let successes = 0
+  // Show spinners on all non-default locales
   try {
-    for (const locale of locales.value) {
-      translatingLocale.value = locale.code
-      try {
-        const t = await i18nApi.autoTranslate(postId.value, locale.code)
-        onTranslationSaved(t)
+    const results = await i18nApi.autoTranslateAll(postId.value)
+    let successes = 0
+    for (const r of results) {
+      translatingLocale.value = r.locale
+      if (r.ok && r.translation) {
+        onTranslationSaved(r.translation)
         successes++
-      } catch {
-        // continue with next locale
       }
     }
-    const total = locales.value.length
+    const total = results.length
     if (successes === total) {
       toast.add({ severity: 'success', summary: 'Traduzione completata', detail: `${total} lingue tradotte`, life: 3000 })
     } else {
       toast.add({ severity: 'warn', summary: 'Traduzione parziale', detail: `${successes} su ${total} riuscite`, life: 4000 })
     }
-    // Refresh form if we're on a translated tab
-    if (activeLocale.value) {
-      const t = getTranslation(activeLocale.value)
-      if (t) translationForm.value = { title: t.title, slug: t.slug, content: t.content, fields: { ...t.fields }, status: t.status }
-    }
+  } catch (err: unknown) {
+    const msg = (err as { message?: string })?.message ?? 'Errore'
+    toast.add({ severity: 'error', summary: 'Traduzione fallita', detail: msg, life: 4000 })
   } finally {
-    translatingAll.value   = false
+    translatingAll.value    = false
     translatingLocale.value = null
   }
 }
