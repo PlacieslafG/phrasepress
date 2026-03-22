@@ -1,120 +1,100 @@
 <template>
   <div class="flex flex-col gap-1">
 
-    <!-- Gerarchico: lista di checkbox inline (no dropdown, no overflow) -->
+    <!-- Gerarchico: lista checkbox inline con indentazione visiva -->
     <template v-if="taxonomy.hierarchical">
-      <div v-if="allTerms.length === 0" class="text-xs text-surface-400 py-1">Nessun termine</div>
-      <div v-else class="flex flex-col gap-0.5 max-h-48 overflow-y-auto">
-        <TermCheckboxRow
-          v-for="term in allTerms"
-          :key="term.id"
-          :term="term"
-          :selected-ids="selectedIds"
-          :depth="0"
-          @toggle="toggleTerm"
-        />
+      <div v-if="flatTree.length === 0" class="text-xs text-surface-400 py-1">Nessun termine</div>
+      <div v-else class="flex flex-col gap-0.5 max-h-52 overflow-y-auto pr-1">
+        <div
+          v-for="item in flatTree"
+          :key="item.id"
+          class="flex items-center gap-2 py-1.5 rounded-md cursor-pointer hover:bg-surface-800 transition-colors select-none"
+          :style="{ paddingLeft: `${item.depth * 14 + 6}px`, paddingRight: '6px' }"
+          @click="toggleHierarchical(item.id)"
+        >
+          <span
+            class="shrink-0 w-4 h-4 rounded border-2 flex items-center justify-center transition-colors"
+            :class="localHierarchical.includes(item.id)
+              ? 'bg-primary-500 border-primary-500'
+              : 'bg-transparent border-surface-500'"
+          >
+            <i v-if="localHierarchical.includes(item.id)" class="pi pi-check text-white" style="font-size: 9px;" />
+          </span>
+          <span class="text-sm leading-none">{{ item.name }}</span>
+        </div>
       </div>
     </template>
 
     <!-- Flat: MultiSelect -->
     <MultiSelect
       v-else
-      v-model="selectedFlat"
+      v-model="localFlat"
       :options="flatTerms"
       option-label="name"
       option-value="id"
+      display="chip"
       placeholder="Seleziona..."
       class="w-full"
       filter
-      @update:model-value="emitFlatChange"
+      @update:model-value="emit('update:selectedIds', $event)"
     />
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onMounted, defineComponent, h } from 'vue'
-import Checkbox from 'primevue/checkbox'
+import { ref, computed, watch, onMounted } from 'vue'
 import { taxonomiesApi } from '@/api/taxonomies.js'
 import type { TaxonomyDefinition, TermWithChildren } from '@/api/taxonomies.js'
 
 const props = defineProps<{
-  taxonomy:     TaxonomyDefinition
-  selectedIds:  number[]
+  taxonomy:    TaxonomyDefinition
+  selectedIds: number[]
 }>()
 
 const emit = defineEmits<{ 'update:selectedIds': [ids: number[]] }>()
 
-const allTerms     = ref<TermWithChildren[]>([])
-const selectedFlat = ref<number[]>([...props.selectedIds])
+const allTerms = ref<TermWithChildren[]>([])
 
-// Flat list for MultiSelect
-const flatTerms = computed(() => flattenTerms(allTerms.value))
+// ── Local state — instant visual feedback independent of prop cycle ────────────
+const localHierarchical = ref<number[]>([...props.selectedIds])
+const localFlat         = ref<number[]>([...props.selectedIds])
 
-function flattenTerms(terms: TermWithChildren[]): { id: number; name: string }[] {
-  const result: { id: number; name: string }[] = []
+// Sync from parent (e.g. after loadPost or auto-translate)
+watch(() => props.selectedIds, (ids) => {
+  localHierarchical.value = [...ids]
+  localFlat.value         = [...ids]
+}, { immediate: true })
+
+// ── Flat tree for rendering ────────────────────────────────────────────────────
+interface FlatItem { id: number; name: string; depth: number }
+
+function flatten(terms: TermWithChildren[], depth = 0): FlatItem[] {
+  const out: FlatItem[] = []
   for (const t of terms) {
-    result.push({ id: t.id, name: t.name })
-    result.push(...flattenTerms(t.children ?? []))
+    out.push({ id: t.id, name: t.name, depth })
+    if (t.children?.length) out.push(...flatten(t.children, depth + 1))
   }
-  return result
+  return out
 }
 
-function toggleTerm(id: number) {
-  const idx = props.selectedIds.indexOf(id)
-  const next = idx >= 0
-    ? props.selectedIds.filter(x => x !== id)
-    : [...props.selectedIds, id]
+const flatTree  = computed(() => flatten(allTerms.value))
+const flatTerms = computed(() => flatten(allTerms.value).map(({ id, name }) => ({ id, name })))
+
+// ── Actions ───────────────────────────────────────────────────────────────────
+function toggleHierarchical(id: number) {
+  const next = localHierarchical.value.includes(id)
+    ? localHierarchical.value.filter(x => x !== id)
+    : [...localHierarchical.value, id]
+  localHierarchical.value = next
   emit('update:selectedIds', next)
 }
 
-function emitFlatChange(ids: number[]) {
-  emit('update:selectedIds', ids)
-}
-
+// ── Load ──────────────────────────────────────────────────────────────────────
 onMounted(async () => {
   try {
     allTerms.value = await taxonomiesApi.getTerms(props.taxonomy.slug)
-  } catch { /* silenzioso */ }
-})
-
-watch(() => props.selectedIds, (ids) => {
-  selectedFlat.value = [...ids]
-}, { immediate: true })
-
-// ── Recursive checkbox row component ──────────────────────────────────────────
-const TermCheckboxRow = defineComponent({
-  name: 'TermCheckboxRow',
-  props: {
-    term:        { type: Object as () => TermWithChildren, required: true },
-    selectedIds: { type: Array as () => number[],          required: true },
-    depth:       { type: Number,                           default: 0 },
-  },
-  emits: ['toggle'],
-  setup(p, { emit: emitRow }) {
-    const checked = computed(() => p.selectedIds.includes(p.term.id))
-    return () => h('div', { class: 'flex flex-col' }, [
-      h('label', {
-        class: 'flex items-center gap-2 py-1 px-1 rounded cursor-pointer hover:bg-surface-800 select-none',
-        style: { paddingLeft: `${p.depth * 16 + 4}px` },
-        onClick: () => emitRow('toggle', p.term.id),
-      }, [
-        h(Checkbox, {
-          modelValue: checked.value,
-          binary: true,
-          class: 'pointer-events-none shrink-0',
-          'onUpdate:modelValue': () => {},
-        }),
-        h('span', { class: 'text-sm truncate' }, p.term.name),
-      ]),
-      ...(p.term.children ?? []).map(child =>
-        h(TermCheckboxRow, {
-          term:        child,
-          selectedIds: p.selectedIds,
-          depth:       p.depth + 1,
-          onToggle:    (id: number) => emitRow('toggle', id),
-        })
-      ),
-    ])
-  },
+  } catch {
+    // Silenzioso — taxonomy potrebbe non avere terms
+  }
 })
 </script>

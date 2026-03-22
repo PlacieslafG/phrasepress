@@ -77,8 +77,8 @@ export interface PostInput {
   title:    string
   content?: string
   status?:  string
-  fields?:  Record<string, unknown>
-  terms?:   Record<string, number[]>
+  fields?:   Record<string, unknown>
+  termIds?:  number[]
 }
 
 const postsApi = {

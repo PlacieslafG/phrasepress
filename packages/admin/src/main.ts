@@ -28,8 +28,8 @@ import Select          from 'primevue/select'
 import Tag             from 'primevue/tag'
 import Textarea        from 'primevue/textarea'
 import Toast           from 'primevue/toast'
+import Tooltip         from 'primevue/tooltip'
 import ToggleSwitch    from 'primevue/toggleswitch'
-import TreeSelect      from 'primevue/treeselect'
 
 import App    from './App.vue'
 import router from './router/index.js'
@@ -62,6 +62,7 @@ app.use(PrimeVue, {
 })
 app.use(ToastService)
 app.use(ConfirmationService)
+app.directive('tooltip', Tooltip)
 
 app.component('Button',          Button)
 app.component('Card',            Card)
@@ -85,7 +86,6 @@ app.component('Tag',             Tag)
 app.component('Textarea',        Textarea)
 app.component('Toast',           Toast)
 app.component('ToggleSwitch',    ToggleSwitch)
-app.component('TreeSelect',      TreeSelect)
 
 // Inizializza preferenze tema (dark mode + colore primario)
 useThemeStore().init()

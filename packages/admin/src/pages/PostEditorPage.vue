@@ -276,7 +276,7 @@ async function save(status: 'draft' | 'published') {
       content: form.value.content,
       status:  form.value.status,
       fields:  form.value.fields,
-      terms:   form.value.termIds,
+      termIds: Object.values(form.value.termIds).flat(),
     }
 
     if (isNew.value) {
