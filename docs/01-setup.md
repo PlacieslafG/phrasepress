@@ -1,121 +1,108 @@
-# Modulo 01 — Setup Monorepo
+# Setup e sviluppo locale
 
-**Dipendenze:** nessuna  
-**Produce:** struttura repository funzionante, TypeScript configurato, pnpm workspaces attivo
+## Requisiti
 
----
-
-## Obiettivo
-
-Creare la struttura base del monorepo con pnpm workspaces, configurare TypeScript condiviso e inizializzare i package `core` e `admin`.
+- **Node.js** 22+
+- **pnpm** 9+
+- Sistema operativo: Linux, macOS o WSL2
 
 ---
 
-## Struttura directory da creare
+## Struttura monorepo
 
 ```
 phrasepress/
 ├── packages/
-│   ├── core/
-│   │   ├── src/
-│   │   │   └── index.ts
-│   │   ├── package.json
-│   │   └── tsconfig.json
-│   ├── admin/
-│   │   ├── src/
-│   │   │   └── main.ts
-│   │   ├── index.html
-│   │   ├── package.json
-│   │   ├── tsconfig.json
-│   │   └── vite.config.ts
+│   ├── core/          # server Node.js + Fastify + SQLite
+│   ├── admin/         # SPA Vue 3 (pannello di amministrazione)
 │   └── plugins/
-│       └── .gitkeep
+│       ├── media/     # plugin gestione file/immagini
+│       ├── fields/    # plugin custom fields avanzati
+│       ├── forms/     # plugin form pubblici
+│       └── mailer/    # plugin invio email
 ├── config/
-│   └── phrasepress.config.ts
-├── data/                        # SQLite db file (gitignored)
-├── package.json                 # root workspace
-├── pnpm-workspace.yaml
+│   └── phrasepress.config.ts   # configurazione del sito
+├── deploy/
+│   └── nginx.conf.template
 ├── tsconfig.base.json
-├── .env.example
-└── .gitignore
+└── pnpm-workspace.yaml
 ```
 
 ---
 
-## File di configurazione chiave
+## Installazione e avvio in sviluppo
 
-### `pnpm-workspace.yaml`
-```yaml
-packages:
-  - 'packages/*'
-  - 'packages/plugins/*'
+```bash
+# 1. Installa dipendenze
+pnpm install
+
+# 2. Crea il file .env (la prima volta)
+cp .env.example .env
+# Modifica i valori (vedi sezione variabili d'ambiente)
+
+# 3. Esegui le migration del database
+cd packages/core && pnpm db:migrate
+
+# 4. Avvia il server core (porta 3000)
+pnpm --filter @phrasepress/core dev
+
+# 5. In un altro terminale: avvia l'admin (porta 5173)
+pnpm --filter @phrasepress/admin dev
 ```
 
-### `tsconfig.base.json` (root)
-- `target`: ES2022
-- `module`: NodeNext
-- `moduleResolution`: NodeNext
-- `strict`: true
-- `esModuleInterop`: true
-- `paths`: mapping `@phrasepress/core` → `packages/core/src/index.ts`
+Apri `http://localhost:5173` per accedere all'admin. Le credenziali iniziali sono quelle definite in `ADMIN_USERNAME` e `ADMIN_PASSWORD` nel file `.env`.
 
-### `packages/core/package.json`
-- `name`: `@phrasepress/core`
-- `type`: `module`
-- Dipendenze prod: `fastify`, `better-sqlite3`, `drizzle-orm`, `argon2`, `@fastify/jwt`, `@fastify/cors`, `@fastify/multipart`
-- Dipendenze dev: `drizzle-kit`, `@types/better-sqlite3`, `tsx`, `typescript`
+---
 
-### `packages/admin/package.json`
-- `name`: `@phrasepress/admin`
-- `type`: `module`
-- Dipendenze: `vue`, `vue-router`, `pinia`, `@tiptap/vue-3`, `@tiptap/starter-kit`, `primevue`, `@primevue/themes`, `primeicons`
-- Dev: `vite`, `@vitejs/plugin-vue`, `tailwindcss`, `typescript`, `vue-tsc`
+## Variabili d'ambiente
 
-### `config/phrasepress.config.ts`
-File di configurazione dell'utente — dove si registrano post type, taxonomy e plugin:
-```ts
-import { defineConfig } from '@phrasepress/core'
+Creare un file `.env` nella root del progetto con queste variabili:
 
-export default defineConfig({
-  postTypes: [ /* ... */ ],
-  taxonomies: [ /* ... */ ],
-  plugins: [ /* ... */ ],
-})
+| Variabile | Obbligatoria | Default | Descrizione |
+|---|---|---|---|
+| `JWT_SECRET` | ✅ | — | Secret per la firma degli access token JWT (min 32 char) |
+| `JWT_REFRESH_SECRET` | ✅ | — | Secret per la firma dei refresh token (min 32 char) |
+| `ADMIN_PASSWORD` | ✅ | — | Password dell'utente `admin` creato al primo avvio |
+| `ADMIN_USERNAME` | | `admin` | Username dell'utente admin iniziale |
+| `DATABASE_PATH` | | `data/phrasepress.db` | Percorso del file SQLite |
+| `PORT` | | `3000` | Porta su cui ascolta Fastify |
+| `NODE_ENV` | | `development` | `development` o `production` |
+| `CORS_ORIGIN` | | `http://localhost:5173` | Origini CORS consentite (separate da virgola) |
+| `DOMAIN` | | — | Dominio pubblico (usato da install.sh e Nginx) |
+
+---
+
+## Comandi disponibili
+
+### Root workspace
+```bash
+pnpm install          # installa tutte le dipendenze
+pnpm build            # compila core (tsc) + admin (vite build)
+pnpm test             # esegue i test del package core
 ```
 
-### `.env.example`
+### packages/core
+```bash
+pnpm dev              # avvia il server in development con tsx watch
+pnpm build            # compila TypeScript → dist/
+pnpm test             # vitest run
+pnpm db:migrate       # applica le migration SQLite in sospeso
+pnpm db:generate      # genera nuove migration da modifiche allo schema Drizzle
+pnpm db:studio        # avvia Drizzle Studio (GUI database)
 ```
-DATABASE_PATH=./data/phrasepress.db
-JWT_SECRET=change-me-in-production
-JWT_REFRESH_SECRET=change-me-in-production
-PORT=3000
-ADMIN_PATH=/admin
-NODE_ENV=development
+
+### packages/admin
+```bash
+pnpm dev              # avvia Vite dev server (porta 5173)
+pnpm build            # produce dist/ per il deploy
+pnpm type-check       # vue-tsc --noEmit
 ```
 
 ---
 
-## Script root `package.json`
+## TypeScript
 
-| Script | Comando |
-|--------|---------|
-| `dev` | Avvia core in watch mode |
-| `dev:admin` | Avvia Vite dev server admin |
-| `build` | Build core + admin |
-| `db:generate` | `drizzle-kit generate` |
-| `db:migrate` | `drizzle-kit migrate` |
-
----
-
-## Checklist
-
-- [ ] Init repo con `pnpm init` root
-- [ ] Crea `pnpm-workspace.yaml`
-- [ ] Crea `tsconfig.base.json`
-- [ ] Init `packages/core` con `package.json` e `tsconfig.json`
-- [ ] Init `packages/admin` con `package.json`, `tsconfig.json`, `vite.config.ts`
-- [ ] Crea struttura directory (`src/db`, `src/hooks`, `src/post-types`, `src/taxonomies`, `src/api`)
-- [ ] Crea `config/phrasepress.config.ts` con `defineConfig()`
-- [ ] Crea `.env.example` e `.gitignore` (esclude `data/`, `.env`, `node_modules/`, `dist/`)
-- [ ] Verifica `pnpm install` da root funziona
-- [ ] Verifica `tsc --noEmit` da core non ha errori
+- `tsconfig.base.json` nella root definisce le opzioni condivise (`strict: true`, `module: NodeNext`, `esModuleInterop: true`)
+- Ogni package estende la base nel proprio `tsconfig.json`
+- I file `.ts` del core usano import con estensione `.js` (richiesto da Node.js ESM)
+- Il package admin usa Vite con `@vitejs/plugin-vue` che gestisce il bundling

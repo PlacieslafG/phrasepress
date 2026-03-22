@@ -1,193 +1,143 @@
-# Modulo 07 — Autenticazione, Utenti e Ruoli
-
-**Dipendenze:** `02-database.md`, `05-hooks.md`  
-**Produce:** JWT auth, CRUD utenti, CRUD ruoli, controllo accessi via capabilities
-
----
-
-## Obiettivo
-
-Gestire l'autenticazione degli utenti admin tramite JWT (access + refresh token) e implementare il sistema di ruoli con capabilities granulari per proteggere le API.
+# Autenticazione e Autorizzazione
 
 ---
 
 ## Strategia JWT
 
-- **Access token:** durata breve (15 minuti), inviato nell'header `Authorization: Bearer <token>`
-- **Refresh token:** durata lunga (7 giorni), inviato come **httpOnly cookie** (non accessibile da JS, protetto da XSS)
-- Al login: emette entrambi i token
-- L'admin SPA usa l'access token per le chiamate API
-- Alla scadenza dell'access token: chiama `POST /auth/refresh` → il server legge il cookie e emette un nuovo access token
-- Al logout: invalida il refresh token (blacklist in memoria o tabella DB)
+PhrasePress usa due token:
 
-### Refresh token storage
-Per semplicità MVP: una tabella `refresh_tokens` nel DB:
-```ts
-refresh_tokens { id, userId, token (hashed), expiresAt, createdAt }
-```
-Al refresh: verifica che il token esista nel DB e non sia scaduto. Al logout: elimina il record.
+- **Access token** — JWT firmato con `JWT_SECRET`, durata **15 minuti**. Inviato nell'header `Authorization: Bearer <token>`. Include nel payload: `sub` (userId), `username`, `roleSlug`, `capabilities[]`.
+- **Refresh token** — stringa random 64 byte, durata **7 giorni**. Inviato come **httpOnly cookie** (`refreshToken`). Conservato nel DB come hash SHA-256.
+
+### Flusso di autenticazione
+
+1. `POST /api/v1/auth/login` → restituisce `accessToken` nel body + imposta cookie `refreshToken`
+2. L'admin SPA usa `accessToken` nell'header per ogni chiamata API
+3. Alla scadenza del token (401): `POST /api/v1/auth/refresh` legge il cookie e emette un nuovo `accessToken`
+4. `POST /api/v1/auth/logout` invalida il refresh token nel DB e cancella il cookie
 
 ---
 
-## Password Hashing
-
-Libreria: **argon2** (più sicuro di bcrypt, raccomandato OWASP)
-- `argon2.hash(password)` al momento della creazione/cambio password
-- `argon2.verify(hash, password)` al login
-- Mai memorizzare password in chiaro, mai loggarle
-
----
-
-## Capabilities e controllo accessi
-
-### Capabilities di default (definite in `02-database.md`)
-
-Il sistema verifica le capabilities a livello di route Fastify tramite un decorator:
-
-```ts
-// Decorator Fastify
-fastify.decorate('requireCapability', (capability: string) => {
-  return async (request, reply) => {
-    const user = request.user  // impostato da JWT plugin
-    if (!hasCapability(user, capability)) {
-      reply.status(403).send({ error: 'Forbidden' })
-    }
-  }
-})
-```
-
-### `hasCapability(user, capability)`
-1. Fetch ruolo dell'utente dal DB (o da cache JWT payload)
-2. Parse `capabilities` JSON del ruolo
-3. Verifica se la capability richiesta è inclusa
-
-### JWT payload
-Il payload dell'access token include:
-```ts
-{
-  sub:          userId,
-  username:     string,
-  roleSlug:     string,
-  capabilities: string[]   // serializzate nel token per evitare DB lookup ad ogni request
-}
-```
-Quando un ruolo viene modificato, i token esistenti diventano obsoleti → l'utente deve fare re-login (accettabile per MVP).
-
----
-
-## API Routes — Auth
-
-Prefisso: `/api/v1/auth`
+## API Auth
 
 ### `POST /api/v1/auth/login`
-Body: `{ username: string, password: string }`
 
-Logica:
-1. Fetch utente per username
-2. Verify password con argon2
-3. Generare access token (15m) + refresh token (7d)
-4. Salvare refresh token hashato in `refresh_tokens`
-5. Impostare refresh token come httpOnly cookie
-6. Risposta: `{ accessToken, user: { id, username, email, role } }`
+**Rate limit:** 10 req/min (100 in development)
+
+**Body:**
+```json
+{ "username": "admin", "password": "..." }
+```
+
+**Risposta `200`:**
+```json
+{
+  "accessToken": "eyJ...",
+  "user": {
+    "id": 1,
+    "username": "admin",
+    "email": "admin@example.com",
+    "role": { "slug": "administrator", "capabilities": ["read", "edit_posts", ...] }
+  }
+}
+```
+
+**Cookie impostato:** `refreshToken` (httpOnly, secure in production, sameSite: strict, 7 giorni)
 
 ### `POST /api/v1/auth/refresh`
-Legge il cookie httpOnly `refreshToken`.
 
-Logica:
-1. Verifica cookie presente
-2. Cerca il token hashato in `refresh_tokens`
-3. Verifica scadenza
-4. Genera nuovo access token
-5. Risposta: `{ accessToken }`
+Legge il cookie `refreshToken`, verifica che esista nel DB e non sia scaduto, emette un nuovo access token.
+
+**Risposta `200`:** `{ "accessToken": "eyJ..." }`
 
 ### `POST /api/v1/auth/logout`
-Richiede auth.
-1. Elimina il record da `refresh_tokens`
-2. Cancella il cookie
-3. Risposta: `{ success: true }`
+
+Richiede autenticazione. Invalida il refresh token corrente nel DB e rimuove il cookie.
+
+**Risposta `200`:** `{ "ok": true }`
 
 ### `GET /api/v1/auth/me`
-Richiede auth.
-Risposta: dati utente corrente (senza passwordHash).
+
+Richiede autenticazione. Restituisce i dati dell'utente corrente con role e capabilities.
 
 ---
 
-## API Routes — Utenti
+## Password
 
-Prefisso: `/api/v1/users`  
-Tutte richiedono auth + capability `manage_users` (eccetto cambio propria password).
-
-### `GET /api/v1/users`
-Lista utenti con ruolo. Risposta senza `passwordHash`.
-
-### `GET /api/v1/users/:id`
-Singolo utente.
-
-### `POST /api/v1/users`
-Body: `{ username, email, password, roleId }`
-- Validare unicità username e email
-- Hash password con argon2
-- Risposta: utente creato (senza hash)
-
-### `PUT /api/v1/users/:id`
-Body: `{ username?, email?, password?, roleId? }`
-- Se `password` presente: re-hash
-- Un utente può modificare solo se stesso (senza `manage_users`) o chiunque (con `manage_users`)
-
-### `DELETE /api/v1/users/:id`
-Richiede `manage_users`. Non permettere auto-eliminazione.
+Le password sono hashate con **argon2** (non bcrypt). Non vengono mai registrate nei log né restituite dalle API.
 
 ---
 
-## API Routes — Ruoli
+## Capabilities
 
-Prefisso: `/api/v1/roles`  
-Richiedono auth + capability `manage_roles`.
+Le capabilities sono string identifier che controllano l'accesso alle route. Ogni ruolo ha un array di capabilities.
 
-### `GET /api/v1/roles`
-Lista ruoli con capabilities (array parsato).
+| Capability | Descrizione |
+|---|---|
+| `read` | Visualizzare contenuti pubblicati |
+| `edit_posts` | Creare e modificare i propri post |
+| `edit_others_posts` | Modificare post di altri utenti |
+| `publish_posts` | Pubblicare post |
+| `delete_posts` | Eliminare i propri post |
+| `delete_others_posts` | Eliminare post altrui |
+| `manage_terms` | Gestire categories e tags |
+| `upload_files` | Caricare file e media |
+| `manage_users` | Creare/modificare/eliminare utenti |
+| `manage_roles` | Creare/modificare ruoli |
+| `manage_plugins` | Attivare/disattivare plugin |
+| `manage_options` | Accedere alle impostazioni di sistema |
 
-### `POST /api/v1/roles`
-Body: `{ name, slug, capabilities: string[] }`
-- Validare che le capabilities siano tutte nel set riconosciuto
+**Regola speciale:** il ruolo `administrator` ha implicitamente tutte le capabilities, indipendentemente dall'array salvato nel DB.
 
-### `PUT /api/v1/roles/:id`
-Stessa validazione. Non permettere di modificare `administrator` per evitare lock-out.
+### Decorator Fastify
 
-### `DELETE /api/v1/roles/:id`
-Non permettere di eliminare `administrator`. Rifiutare se ci sono utenti con quel ruolo.
+```ts
+// Verifica il token JWT e popola request.userId, request.userCapabilities, request.userRoleSlug
+fastify.authenticate
 
----
-
-## Struttura file
-
+// Verifica una capability specifica (usare dopo authenticate)
+fastify.requireCapability('manage_users')
 ```
-src/auth/
-├── jwt.ts          # setup @fastify/jwt, decorator requireCapability
-├── password.ts     # hash/verify con argon2
-├── capabilities.ts # lista capabilities, hasCapability()
-└── index.ts
 
-src/api/
-├── auth.ts         # route /auth/*
-├── users.ts        # route /users/*
-└── roles.ts        # route /roles/*
+Esempio di route protetta:
+```ts
+app.get('/my-route', {
+  preHandler: [ctx.fastify.authenticate, ctx.fastify.requireCapability('manage_options')],
+}, async (req) => { ... })
 ```
 
 ---
 
-## Checklist
+## Ruoli di default
 
-- [ ] Installare e configurare `@fastify/jwt` e `@fastify/cookie`
-- [ ] Creare tabella `refresh_tokens` nello schema Drizzle (→ ri-generare migration)
-- [ ] Implementare `password.ts` con argon2 hash/verify
-- [ ] Implementare `jwt.ts` con setup Fastify e decorator `requireCapability`
-- [ ] Implementare `hasCapability()` con lettura da JWT payload
-- [ ] Implementare `POST /auth/login` completo
-- [ ] Implementare `POST /auth/refresh` con cookie httpOnly
-- [ ] Implementare `POST /auth/logout`
-- [ ] Implementare `GET /auth/me`
-- [ ] Implementare CRUD `/users`
-- [ ] Implementare CRUD `/roles` con protezioni (no delete admin, no delete ruolo in uso)
-- [ ] Applicare `requireCapability` a tutte le route protette dei moduli precedenti
-- [ ] Testare flow completo: login → chiamata protetta → refresh → logout
+| Slug | Capabilities |
+|---|---|
+| `administrator` | Tutte |
+| `editor` | `read`, `edit_posts`, `edit_others_posts`, `publish_posts`, `delete_posts`, `manage_terms` |
+| `author` | `read`, `edit_posts`, `publish_posts`, `delete_posts` |
+
+---
+
+## API Utenti
+
+Base path: `/api/v1/users`. Richiedono `manage_users` tranne GET /:id (visibile a se stessi).
+
+| Metodo | Path | Descrizione |
+|---|---|---|
+| GET | `/users` | Lista tutti gli utenti con ruolo |
+| GET | `/users/:id` | Dettaglio utente (solo sé stesso o manage_users) |
+| POST | `/users` | Crea utente (`username`, `email`, `password`, `roleSlug?`) |
+| PUT | `/users/:id` | Aggiorna utente (`email?`, `password?`, `roleSlug?`) |
+| DELETE | `/users/:id` | Elimina utente (non se stesso) |
+
+## API Ruoli
+
+Base path: `/api/v1/roles`. Richiedono `manage_roles`.
+
+| Metodo | Path | Descrizione |
+|---|---|---|
+| GET | `/roles` | Lista tutti i ruoli |
+| GET | `/roles/:id` | Dettaglio ruolo |
+| POST | `/roles` | Crea ruolo (`name`, `slug`, `capabilities[]`) |
+| PUT | `/roles/:id` | Aggiorna ruolo (`name?`, `capabilities[]?`) |
+| DELETE | `/roles/:id` | Elimina ruolo (non `administrator`) |

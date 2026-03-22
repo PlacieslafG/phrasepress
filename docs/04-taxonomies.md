@@ -1,153 +1,125 @@
-# Modulo 04 — Taxonomies & Terms
+# Taxonomies e Terms
 
-**Dipendenze:** `02-database.md`, `03-post-types.md`  
-**Produce:** registro taxonomy, CRUD API per taxonomy e terms, associazioni post/terms
+## Taxonomy di default
+
+All'avvio vengono registrate e sincronizzate nel DB:
+
+| Slug | Name | Post types | Hierarchical |
+|---|---|---|---|
+| `category` | Categories | `post` | ✅ |
+| `tag` | Tags | `post` | ❌ |
+
+Le taxonomy custom si dichiarano in `config/phrasepress.config.ts`.
 
 ---
 
-## Obiettivo
-
-Creare il sistema di classificazione dei contenuti: taxonomies configurabili e terms gestibili. Permette di filtrare post per categoria, tag o qualsiasi classificazione custom.
-
----
-
-## TaxonomyRegistry
-
-File: `packages/core/src/taxonomies/registry.ts`
-
-### Interfacce TypeScript
+## TaxonomyDefinition
 
 ```ts
 interface TaxonomyDefinition {
-  name:         string       // label plurale, es. 'Genres'
-  slug:         string       // identificatore, es. 'genre'
-  postTypes:    string[]     // a quali post type si applica, es. ['book', 'movie']
-  hierarchical: boolean      // true = categorie annidate, false = tag flat
-  icon?:        string
+  slug:         string     // identificatore, es. 'genre'
+  name:         string     // etichetta plurale, es. 'Genres'
+  postTypes:    string[]   // post type a cui si applica
+  hierarchical: boolean    // true = struttura ad albero (come categorie)
+  icon?:        string     // icona PrimeIcons
 }
 ```
 
-### Classe `TaxonomyRegistry`
-- `register(def: TaxonomyDefinition): void`
-- `get(slug: string): TaxonomyDefinition | undefined`
-- `getAll(): TaxonomyDefinition[]`
-- `getForPostType(postType: string): TaxonomyDefinition[]`
-
-### Taxonomies di default (registrate al boot)
-```ts
-registry.register({ slug: 'category', name: 'Categories', postTypes: ['post'], hierarchical: true })
-registry.register({ slug: 'tag',      name: 'Tags',       postTypes: ['post'], hierarchical: false })
-```
+Le taxonomy vengono sincronizzate con il DB all'avvio (`syncTaxonomiesWithDb`): crea il record se non esiste, non elimina taxonomy rimosse dalla config (per preservare i terms).
 
 ---
 
-## Sincronizzazione Registro → DB
+## REST API — Taxonomies
 
-Al boot, dopo le migration, il sistema verifica che ogni taxonomy presente nel registro esista nella tabella `taxonomies`. Se non esiste, la inserisce. Le taxonomy removed dal registro restano nel DB (dati storici non eliminati automaticamente).
-
-File: `packages/core/src/taxonomies/sync.ts`
-```ts
-export async function syncTaxonomiesWithDb(registry, db): Promise<void>
-```
-
----
-
-## API Routes — Taxonomies
-
-Prefisso: `/api/v1`  
-File: `packages/core/src/api/taxonomies.ts`
+Base path: `/api/v1/taxonomies`. Tutte le route richiedono autenticazione.
 
 ### `GET /api/v1/taxonomies`
-Risposta: lista di tutte le taxonomy registrate (da registro, non da DB) con le loro definizioni.
+
+Restituisce la lista di tutte le taxonomy registrate (dal registro in memoria).
+
+**Risposta:**
+```json
+[
+  { "slug": "category", "name": "Categories", "postTypes": ["post"], "hierarchical": true }
+]
+```
 
 ### `GET /api/v1/taxonomies/:taxonomySlug/terms`
 
-Query params:
-- `parent` — filtra per parent term ID (usa `0` o assente per root)
-- `search` — ricerca per nome
-- `page`, `limit`
-- `hierarchical` — se `true`, ritorna struttura ad albero annidata
+Elenca i terms di una taxonomy, con `postCount` per ciascuno.
 
-Risposta flat: `{ data: Term[], total }`  
-Risposta hierarchical: `{ data: TermTree[] }` dove `TermTree = Term & { children: TermTree[] }`
+Per taxonomy gerarchiche, i terms sono restituiti come albero annidato (`children: []`).
 
-### `GET /api/v1/taxonomies/:taxonomySlug/terms/:idOrSlug`
-Risposta: term singolo.
+**Query params:**
+
+| Param | Tipo | Descrizione |
+|---|---|---|
+| `search` | string | Filtra per nome |
+| `parentId` | number | Solo figli di un parent specifico |
+
+**Risposta (flat):**
+```json
+[
+  { "id": 1, "name": "Tech", "slug": "tech", "parentId": null, "postCount": 5 }
+]
+```
+
+**Risposta (hierarchical):**
+```json
+[
+  {
+    "id": 1, "name": "Tech", "slug": "tech", "postCount": 5,
+    "children": [
+      { "id": 2, "name": "AI", "slug": "ai", "parentId": 1, "postCount": 2, "children": [] }
+    ]
+  }
+]
+```
 
 ### `POST /api/v1/taxonomies/:taxonomySlug/terms`
-Richiede auth + capability `manage_terms`.
 
-Body:
-```ts
-{
-  name:         string
-  slug?:        string    // auto-generato da name se omesso
-  description?: string
-  parentId?:    number    // per tassonomie gerarchiche
-}
-```
+Crea un nuovo term. Richiede `manage_terms`.
 
-Validazioni:
-- Slug unico nella taxonomy
-- Se `parentId` fornito, verificare che il parent appartenga alla stessa taxonomy
-- Se taxonomy non è `hierarchical`, rifiutare `parentId`
-
-### `PUT /api/v1/taxonomies/:taxonomySlug/terms/:id`
-Richiede auth + capability `manage_terms`.  
-Stessa validazioni del POST.  
-Impedire di impostare come parent un discendente del termine stesso (ciclo).
-
-### `DELETE /api/v1/taxonomies/:taxonomySlug/terms/:id`
-Richiede auth + capability `manage_terms`.
-
-Logica:
-- Se il term ha figli: rifiuta (o opzione `?reassignChildren=termId`)
-- Elimina associazioni in `post_terms`
-- Elimina il term
-
-### `GET /api/v1/posts/:id/terms`
-Risposta: tutti i terms associati al post, raggruppati per taxonomy:
+**Body:**
 ```json
 {
-  "category": [{ "id": 1, "name": "Tech", "slug": "tech" }],
-  "tag": [{ "id": 5, "name": "Node.js", "slug": "nodejs" }]
+  "name":        "Tecnologia",
+  "slug":        "tecnologia",
+  "description": "...",
+  "parentId":    null
 }
 ```
 
-### `PUT /api/v1/posts/:id/terms`
-Richiede auth + capability `edit_posts`.
+`slug` è opzionale (generato da `name`). `parentId` è opzionale (solo per taxonomy gerarchiche).
 
-Body: `{ termIds: number[] }`  
-Rimpiazza completamente le associazioni del post.
+**Risposta:** `201 Created`
+
+### `PUT /api/v1/taxonomies/:taxonomySlug/terms/:id`
+
+Aggiorna un term. Richiede `manage_terms`.
+
+Previene cicli gerarchici: non è possibile impostare come `parentId` un discendente del term stesso.
+
+**Risposta:** `200 OK`
+
+### `DELETE /api/v1/taxonomies/:taxonomySlug/terms/:id`
+
+Elimina un term e tutte le sue associazioni con i post. Richiede `manage_terms`.
+
+Per taxonomy gerarchiche, i figli del term eliminato vengono spostati al livello root (il loro `parentId` diventa `null`).
+
+**Risposta:** `204 No Content`
 
 ---
 
-## Struttura file
+## Associazione post ↔ terms
 
-```
-src/taxonomies/
-├── registry.ts     # TaxonomyRegistry class
-├── sync.ts         # sincronizzazione registro → DB al boot
-└── index.ts        # export pubblici
+Quando si crea o aggiorna un post, il campo `termIds` nell'API post gestisce le associazioni:
 
-src/api/
-├── taxonomies.ts   # route /taxonomies e /posts/:id/terms
+```json
+{ "termIds": [1, 3, 7] }
 ```
 
----
+Le associazioni vengono completamente rimpiazzate ad ogni aggiornamento (DELETE + INSERT su `post_terms`).
 
-## Checklist
-
-- [ ] Scrivere interfaccia `TaxonomyDefinition`
-- [ ] Implementare `TaxonomyRegistry`
-- [ ] Registrare taxonomies default (`category`, `tag`) nel bootstrap
-- [ ] Implementare `syncTaxonomiesWithDb()` e chiamarla al boot
-- [ ] Implementare `GET /taxonomies`
-- [ ] Implementare `GET /taxonomies/:slug/terms` (flat + hierarchical)
-- [ ] Implementare `GET /taxonomies/:slug/terms/:idOrSlug`
-- [ ] Implementare `POST /taxonomies/:slug/terms` con validazioni
-- [ ] Implementare `PUT /taxonomies/:slug/terms/:id` con controllo cicli
-- [ ] Implementare `DELETE /taxonomies/:slug/terms/:id`
-- [ ] Implementare `GET /posts/:id/terms`
-- [ ] Implementare `PUT /posts/:id/terms`
-- [ ] Testare associazioni molti-a-molti e filtri per term in `GET /posts`
+Per filtrare i post per term, usare il query param `termSlug` sull'API dei post.

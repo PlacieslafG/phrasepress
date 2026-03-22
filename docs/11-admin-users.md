@@ -1,129 +1,44 @@
-# Modulo 11 — Admin: Utenti e Ruoli
-
-**Dipendenze:** `08-admin-shell.md`, `07-auth.md`  
-**Produce:** pagine per gestire utenti e ruoli con capabilities
+# Gestione Utenti e Ruoli
 
 ---
 
-## Obiettivo
+## Pagina Utenti (`UsersPage.vue`)
 
-Permettere all'amministratore di gestire chi ha accesso all'admin e con quali permessi, tramite un sistema di ruoli configurabili con capabilities granulari.
+Richiede capability `manage_users`.
 
----
-
-## `UsersPage.vue`
-
-Route: `/users`  
-Richiede capability: `manage_users`
-
-### Layout
-
-```
-┌──────────────────────────────────────────────┐
-│ Utenti                          [+ Nuovo]    │
-├──────────────────────────────────────────────┤
-│  Username    Email           Ruolo    Azioni  │
-│  ──────────────────────────────────────────  │
-│  admin       a@example.com  Admin    ✏️ 🗑️   │
-│  mario       m@example.com  Editor   ✏️ 🗑️   │
-└──────────────────────────────────────────────┘
-```
-
-### Comportamento
-- Click "+ Nuovo" → apre `Dialog` (PrimeVue) con `UserForm`
-- Click "Modifica" → apre lo stesso dialog pre-compilato
-- Click "Elimina" → dialog di conferma, poi `DELETE /users/:id`
-  - Non mostrare il pulsante elimina per l'utente corrente loggato
-
-### `UserForm.vue` (in Dialog)
-Campi:
-- Username (required, unico)
-- Email (required, unico)
-- Password (required per nuovo, facoltativa per modifica — se vuota non cambia)
-- Ruolo: `<Select>` con lista ruoli da `GET /roles`
+### Funzionalità
+- Lista utenti con colonne: username, email, ruolo, data registrazione
+- **Crea utente**: dialog con username, email, password, ruolo (select dai ruoli disponibili)
+- **Modifica utente**: cambia email, password, ruolo. Il proprio ruolo non può essere modificato.
+- **Elimina utente**: dialog di conferma. Non si può eliminare se stessi.
 
 ---
 
-## `RolesPage.vue`
+## Pagina Ruoli (`RolesPage.vue`)
 
-Route: `/roles`  
-Richiede capability: `manage_roles`
+Richiede capability `manage_roles`.
 
-### Layout
+### Funzionalità
+- Lista ruoli come card, ognuna mostra nome, slug e capabilities attive come badge colorati
+- **Crea ruolo**: dialog con nome, slug (auto-generato, non modificabile dopo la creazione), selezione capabilities
+- **Modifica ruolo**: stesso dialog; lo slug non è modificabile
+- **Elimina ruolo**: dialog di conferma. Il ruolo `administrator` non può essere eliminato.
+- Il ruolo `administrator` non ha il bottone Elimina
 
-```
-┌──────────────────────────────────────────────────────────┐
-│ Ruoli                                    [+ Nuovo Ruolo] │
-├──────────────────────────────────────────────────────────┤
-│ ┌─ Administrator ────────────────────────────────────┐   │
-│ │ ✅ edit_posts  ✅ publish_posts  ✅ manage_users    │   │
-│ │ ✅ manage_roles  ✅ manage_plugins  ...              │   │
-│ │                                     [Modifica]      │   │
-│ └─────────────────────────────────────────────────────┘   │
-│ ┌─ Editor ───────────────────────────────────────────┐   │
-│ │ ✅ edit_posts  ✅ publish_posts  ✅ manage_terms    │   │
-│ │ ❌ manage_users  ❌ manage_plugins  ...              │   │
-│ │                               [Modifica] [Elimina]  │   │
-│ └─────────────────────────────────────────────────────┘   │
-└──────────────────────────────────────────────────────────┘
-```
-
-### Comportamento
-- Ogni ruolo è una card espandibile che mostra le capabilities
-- Le capabilities sono raggruppate per area (Post, Taxonomy, Utenti, Sistema)
-- Click "Modifica" → apre `Dialog` con `RoleForm`
-- Click "Elimina" → solo se nessun utente usa quel ruolo e non è `administrator`
-
-### `RoleForm.vue` (in Dialog)
-Campi:
-- Nome (required)
-- Slug (auto-generato dal nome, non modificabile dopo creazione)
-- Capabilities: griglia di checkbox raggruppate per area
-
-```
-Contenuto:
-  ☑ read
-  ☑ edit_posts
-  ☐ edit_others_posts
-  ☑ publish_posts
-  ☐ delete_posts
-
-Utenti & Sistema:
-  ☐ manage_users
-  ☐ manage_roles
-  ☐ manage_plugins
-  ☐ manage_options
-```
-
-### Grouping capabilities nell'UI
-
-```ts
-const CAPABILITY_GROUPS = {
-  'Contenuto': ['read', 'edit_posts', 'edit_others_posts', 'publish_posts', 'delete_posts', 'delete_others_posts'],
-  'Tassonomie': ['manage_terms'],
-  'Media': ['upload_files'],
-  'Amministrazione': ['manage_users', 'manage_roles', 'manage_plugins', 'manage_options'],
-}
-```
+### Gestione capabilities nel dialog
+- Le capabilities sono raggruppate in: Contenuto, Tassonomie, Media, Amministrazione
+- Ogni gruppo ha un toggle "seleziona/deseleziona tutto" con indicatore indeterminate
+- Ogni capability ha una descrizione in chiaro di cosa consente
+- Quick actions "Seleziona tutte" / "Deseleziona tutte"
 
 ---
 
-## Profilo utente corrente
+## Pagina Profilo (`ProfilePage.vue`)
 
-Route: `/profile` (aggiunta nella sidebar sotto il nome utente)  
-Permette all'utente loggato di modificare i propri dati: email, password. Non richiede `manage_users`.
+Accessibile a tutti gli utenti autenticati. Permette di modificare email e password.
 
 ---
 
-## Checklist
+## Capabilities disponibili
 
-- [ ] Implementare `UsersPage.vue` con lista e dialog
-- [ ] Implementare `UserForm.vue` con validazione lato client (email formato, password min 8 chars)
-- [ ] Collegare form utente con `POST /users` e `PUT /users/:id`
-- [ ] Collegare eliminazione utente con controllo "non puoi eliminare te stesso"
-- [ ] Implementare `RolesPage.vue` con card capabilities
-- [ ] Implementare `RoleForm.vue` con checkbox raggruppate
-- [ ] Collegare form ruolo con `POST /roles` e `PUT /roles/:id`
-- [ ] Collegare eliminazione ruolo con controllo server (ruolo in uso)
-- [ ] Implementare pagina `/profile` per modifica dati propri
-- [ ] Testare: creare ruolo custom, assegnarlo a utente, verificare accessi
+Vedi `docs/07-auth.md` per la tabella completa delle capabilities.

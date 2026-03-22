@@ -1,197 +1,153 @@
-# Modulo 02 — Schema Database
+# Schema Database
 
-**Dipendenze:** `01-setup.md`  
-**Produce:** schema Drizzle completo, migration iniziale, DB client singleton
+PhrasePress usa **SQLite** via `better-sqlite3`, con **Drizzle ORM** per la type-safety dello schema e le migration. Il file di database è in `data/phrasepress.db` per default.
 
----
-
-## Obiettivo
-
-Definire tutte le tabelle con Drizzle ORM su SQLite, generare la prima migration e creare il client DB da usare nel resto del core.
+Il client database è un singleton: `packages/core/src/db/client.ts`. Le migration vengono applicate automaticamente all'avvio del server.
 
 ---
 
 ## Tabelle
 
-### `posts`
-```ts
-{
-  id:          integer (PK, autoincrement)
-  postType:    text     NOT NULL          // 'post' | 'page' | custom
-  title:       text     NOT NULL
-  slug:        text     NOT NULL
-  content:     text     DEFAULT ''        // rich text HTML (da Tiptap)
-  fields:      text     DEFAULT '{}'      // JSON blob dei custom fields
-  status:      text     DEFAULT 'draft'   // 'draft' | 'published' | 'trash'
-  authorId:    integer  REFERENCES users(id)
-  createdAt:   integer  NOT NULL          // Unix timestamp
-  updatedAt:   integer  NOT NULL
-}
-// UNIQUE INDEX su (postType, slug)
-```
-
-### `post_field_index`
-Tabella per query veloci su custom fields con `queryable: true`.
-```ts
-{
-  id:           integer (PK, autoincrement)
-  postId:       integer  NOT NULL  REFERENCES posts(id) ON DELETE CASCADE
-  fieldName:    text     NOT NULL
-  stringValue:  text               // usato per type: string | select | date
-  numberValue:  real               // usato per type: number
-}
-// INDEX su (fieldName, stringValue)
-// INDEX su (fieldName, numberValue)
-// INDEX su (postId)
-```
-
-### `post_revisions`
-```ts
-{
-  id:        integer (PK, autoincrement)
-  postId:    integer  NOT NULL  REFERENCES posts(id) ON DELETE CASCADE
-  title:     text     NOT NULL
-  slug:      text     NOT NULL
-  content:   text     NOT NULL
-  fields:    text     NOT NULL   // JSON snapshot
-  status:    text     NOT NULL
-  authorId:  integer  REFERENCES users(id)
-  createdAt: integer  NOT NULL
-}
-// INDEX su (postId)
-```
-
-### `taxonomies`
-```ts
-{
-  id:           integer (PK, autoincrement)
-  name:         text  NOT NULL
-  slug:         text  NOT NULL  UNIQUE
-  hierarchical: integer DEFAULT 0  // 0 = false, 1 = true (SQLite non ha boolean)
-}
-```
-
-### `terms`
-```ts
-{
-  id:           integer (PK, autoincrement)
-  taxonomyId:   integer NOT NULL  REFERENCES taxonomies(id) ON DELETE CASCADE
-  name:         text    NOT NULL
-  slug:         text    NOT NULL
-  description:  text    DEFAULT ''
-  parentId:     integer REFERENCES terms(id)
-}
-// UNIQUE INDEX su (taxonomyId, slug)
-```
-
-### `post_terms`
-```ts
-{
-  postId:  integer  NOT NULL  REFERENCES posts(id) ON DELETE CASCADE
-  termId:  integer  NOT NULL  REFERENCES terms(id) ON DELETE CASCADE
-}
-// PRIMARY KEY (postId, termId)
-```
-
 ### `roles`
-```ts
-{
-  id:           integer (PK, autoincrement)
-  name:         text  NOT NULL
-  slug:         text  NOT NULL  UNIQUE
-  capabilities: text  NOT NULL  DEFAULT '[]'  // JSON array: ['edit_posts', ...]
-}
-```
+
+Ruoli utente con capabilities JSON.
+
+| Colonna | Tipo | Note |
+|---|---|---|
+| `id` | INTEGER PK autoincrement | |
+| `name` | TEXT NOT NULL | Es. `Administrator` |
+| `slug` | TEXT NOT NULL UNIQUE | Es. `administrator` |
+| `capabilities` | TEXT NOT NULL DEFAULT `'[]'` | JSON `string[]` |
 
 ### `users`
-```ts
-{
-  id:           integer (PK, autoincrement)
-  username:     text  NOT NULL  UNIQUE
-  email:        text  NOT NULL  UNIQUE
-  passwordHash: text  NOT NULL
-  roleId:       integer  REFERENCES roles(id)
-  createdAt:    integer  NOT NULL
-}
-```
+
+| Colonna | Tipo | Note |
+|---|---|---|
+| `id` | INTEGER PK autoincrement | |
+| `username` | TEXT NOT NULL UNIQUE | |
+| `email` | TEXT NOT NULL UNIQUE | |
+| `password_hash` | TEXT NOT NULL | Hash argon2 |
+| `role_id` | INTEGER FK → `roles.id` | |
+| `created_at` | INTEGER NOT NULL | Unix timestamp |
+
+### `posts`
+
+| Colonna | Tipo | Note |
+|---|---|---|
+| `id` | INTEGER PK autoincrement | |
+| `post_type` | TEXT NOT NULL | Es. `post`, `page`, custom |
+| `title` | TEXT NOT NULL | |
+| `slug` | TEXT NOT NULL | |
+| `content` | TEXT NOT NULL DEFAULT `''` | HTML da Tiptap |
+| `fields` | TEXT NOT NULL DEFAULT `'{}'` | JSON blob custom fields |
+| `status` | TEXT NOT NULL DEFAULT `'draft'` | `draft`, `published`, `trash` |
+| `author_id` | INTEGER FK → `users.id` | |
+| `created_at` | INTEGER NOT NULL | Unix timestamp |
+| `updated_at` | INTEGER NOT NULL | Unix timestamp |
+
+**Indici:** UNIQUE su `(post_type, slug)`
+
+### `post_field_index`
+
+Indice per query veloci su custom fields con `queryable: true`. Aggiornato ad ogni salvataggio del post (DELETE + INSERT per il post).
+
+| Colonna | Tipo | Note |
+|---|---|---|
+| `id` | INTEGER PK autoincrement | |
+| `post_id` | INTEGER FK → `posts.id` ON DELETE CASCADE | |
+| `field_name` | TEXT NOT NULL | |
+| `string_value` | TEXT | Per campi di tipo string, select, date |
+| `number_value` | REAL | Per campi di tipo number |
+
+**Indici:** `(field_name, string_value)`, `(field_name, number_value)`, `(post_id)`
+
+### `post_revisions`
+
+Snapshot del post creato automaticamente **prima** di ogni aggiornamento tramite `PUT /posts/:id`.
+
+| Colonna | Tipo | Note |
+|---|---|---|
+| `id` | INTEGER PK autoincrement | |
+| `post_id` | INTEGER FK → `posts.id` ON DELETE CASCADE | |
+| `title` | TEXT NOT NULL | |
+| `slug` | TEXT NOT NULL | |
+| `content` | TEXT NOT NULL | |
+| `fields` | TEXT NOT NULL | JSON snapshot |
+| `status` | TEXT NOT NULL | |
+| `author_id` | INTEGER FK → `users.id` | |
+| `created_at` | INTEGER NOT NULL | Unix timestamp |
+
+### `taxonomies`
+
+| Colonna | Tipo | Note |
+|---|---|---|
+| `id` | INTEGER PK autoincrement | |
+| `name` | TEXT NOT NULL | Es. `Categories` |
+| `slug` | TEXT NOT NULL UNIQUE | Es. `category` |
+| `hierarchical` | INTEGER NOT NULL DEFAULT `0` | `0` = flat, `1` = hierarchical |
+
+### `terms`
+
+| Colonna | Tipo | Note |
+|---|---|---|
+| `id` | INTEGER PK autoincrement | |
+| `taxonomy_id` | INTEGER FK → `taxonomies.id` ON DELETE CASCADE | |
+| `name` | TEXT NOT NULL | |
+| `slug` | TEXT NOT NULL | |
+| `description` | TEXT NOT NULL DEFAULT `''` | |
+| `parent_id` | INTEGER FK → `terms.id` (self-referential) | Null per root |
+
+**Indici:** UNIQUE su `(taxonomy_id, slug)`
+
+### `post_terms`
+
+Tabella di associazione N:M tra post e terms. Nessuna colonna extra.
+
+| Colonna | Tipo |
+|---|---|
+| `post_id` | INTEGER FK → `posts.id` ON DELETE CASCADE |
+| `term_id` | INTEGER FK → `terms.id` ON DELETE CASCADE |
+
+**PK:** `(post_id, term_id)`
 
 ### `plugin_status`
-```ts
-{
-  id:          integer (PK, autoincrement)
-  pluginName:  text     NOT NULL  UNIQUE
-  active:      integer  DEFAULT 0   // 0 | 1
-  activatedAt: integer
-}
-```
+
+Stato di attivazione dei plugin.
+
+| Colonna | Tipo | Note |
+|---|---|---|
+| `id` | INTEGER PK autoincrement | |
+| `plugin_name` | TEXT NOT NULL UNIQUE | Es. `phrasepress-media` |
+| `active` | INTEGER NOT NULL DEFAULT `0` | `0` = inattivo, `1` = attivo |
+| `activated_at` | INTEGER | Unix timestamp ultima attivazione |
+
+### `refresh_tokens`
+
+| Colonna | Tipo | Note |
+|---|---|---|
+| `id` | INTEGER PK autoincrement | |
+| `user_id` | INTEGER FK → `users.id` ON DELETE CASCADE | |
+| `token_hash` | TEXT NOT NULL UNIQUE | SHA-256 del token raw |
+| `expires_at` | INTEGER NOT NULL | Unix timestamp |
+| `created_at` | INTEGER NOT NULL | Unix timestamp |
 
 ---
 
-## Capabilities di default
+## Seed iniziale
 
-```ts
-// Capabilities disponibili nel sistema
-const CAPABILITIES = [
-  'read',
-  'edit_posts',
-  'edit_others_posts',
-  'publish_posts',
-  'delete_posts',
-  'delete_others_posts',
-  'manage_terms',        // crea/modifica/elimina terms
-  'manage_users',        // crea/modifica/elimina utenti
-  'manage_roles',        // crea/modifica/elimina ruoli
-  'manage_plugins',      // attiva/disattiva plugin
-  'manage_options',      // impostazioni generali
-  'upload_files',        // (usato dal plugin media)
-] as const
-```
-
-### Ruoli di default
-| Ruolo | Capabilities |
-|---|---|
-| `administrator` | tutte |
-| `editor` | `read`, `edit_posts`, `edit_others_posts`, `publish_posts`, `delete_posts`, `manage_terms` |
-| `author` | `read`, `edit_posts`, `publish_posts`, `delete_posts` |
+Al primo avvio (se non esiste nessun utente), `seedDatabase()` inserisce:
+- 3 ruoli di default: `administrator`, `editor`, `author`
+- 1 utente `admin` con password da `ADMIN_PASSWORD` env var
 
 ---
 
-## Struttura file in `packages/core/src/db/`
+## Migration
 
+Le migration sono file SQL in `packages/core/src/db/migrations/`. Drizzle Kit le genera automaticamente dal diff dello schema:
+
+```bash
+cd packages/core && pnpm db:generate   # genera file .sql da modifiche a schema.ts
+cd packages/core && pnpm db:migrate    # applica le migration in sospeso
 ```
-db/
-├── client.ts       # crea e restituisce il singleton DB (better-sqlite3)
-├── schema.ts       # tutti i sqliteTable() di Drizzle
-├── migrate.ts      # esegue le migration al boot
-└── seed.ts         # inserisce ruoli e utente admin di default al primo avvio
-```
 
-### `client.ts`
-- Legge `DATABASE_PATH` da env
-- Crea il file SQLite se non esiste
-- Abilita `PRAGMA foreign_keys = ON`
-- Restituisce il client Drizzle wrappato su better-sqlite3
-- Export come singleton: `export const db = ...`
-
-### `migrate.ts`
-- Chiamato nel bootstrap del server
-- Usa `drizzle-kit migrate` per applicare le migration pendenti
-- Stampa log delle migration applicate
-
-### `seed.ts`
-- Controlla se esiste già almeno un utente
-- Se no: inserisce i ruoli default + un utente `admin` con password dall'env (`ADMIN_PASSWORD`)
-- Eseguito una volta sola dopo le migration
-
----
-
-## Checklist
-
-- [ ] Scrivere `schema.ts` con tutte le tabelle Drizzle
-- [ ] Aggiungere tutti gli indici critici (`post_field_index`, slug, etc.)
-- [ ] Scrivere `client.ts` con singleton e PRAGMA foreign keys
-- [ ] Configurare `drizzle.config.ts` (punta a `schema.ts`, output `./migrations`)
-- [ ] Eseguire `pnpm db:generate` per generare la prima migration SQL
-- [ ] Scrivere `migrate.ts` da chiamare al boot
-- [ ] Scrivere `seed.ts` con ruoli default e utente admin
-- [ ] Testare: cancellare `data/`, riavviare → DB ricreato con migration + seed
+Il server applica automaticamente le migration in sospeso all'avvio in produzione.

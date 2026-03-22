@@ -1,176 +1,160 @@
-# Modulo 03 — Post Types & CRUD Posts
+# Post Types e API Post
 
-**Dipendenze:** `02-database.md`  
-**Produce:** registro post type, slug automatico, CRUD API Fastify per i post
+## Post type di default
+
+All'avvio del server vengono registrati automaticamente:
+
+| Name | Label | Icon |
+|---|---|---|
+| `post` | Posts | `pi-file-edit` |
+| `page` | Pages | `pi-file-o` |
+
+I post type custom vengono dichiarati in `config/phrasepress.config.ts` (vedi `docs/08-admin-shell.md`).
 
 ---
 
-## Obiettivo
-
-Creare il registro dei post type e le API REST per creare, leggere, aggiornare ed eliminare i post. La logica dei custom fields (indicizzazione) è gestita qui al momento del salvataggio.
-
----
-
-## PostTypeRegistry
-
-File: `packages/core/src/post-types/registry.ts`
-
-### Interfacce TypeScript
+## PostTypeDefinition
 
 ```ts
-type FieldType = 'string' | 'number' | 'boolean' | 'richtext' | 'date' | 'select'
+interface PostTypeDefinition {
+  name:    string            // identificatore univoco, es. 'product'
+  label:   string            // etichetta UI, es. 'Products'
+  icon?:   string            // icona PrimeIcons, es. 'pi-box'
+  fields?: FieldDefinition[] // campi custom
+}
+```
+
+### FieldDefinition
+
+```ts
+type FieldType =
+  | 'string'       // testo breve
+  | 'number'       // numero
+  | 'boolean'      // vero/falso
+  | 'richtext'     // HTML da Tiptap
+  | 'date'         // data ISO
+  | 'select'       // selezione da lista
+  | 'textarea'     // testo lungo
+  | 'image'        // ID media (plugin media)
+  | 'relationship' // ID di un altro post
+  | 'repeater'     // array di sottocampi
 
 interface FieldDefinition {
-  name:       string
-  type:       FieldType
-  label?:     string
-  queryable?: boolean          // default false — se true, scritto in post_field_index
-  required?:  boolean
-  options?:   string[]         // solo per type: 'select'
-  default?:   unknown
-}
-
-interface PostTypeDefinition {
-  name:     string             // es. 'product'
-  label:    string             // es. 'Products'
-  icon?:    string             // nome icona PrimeIcons
-  fields?:  FieldDefinition[]
+  name:          string
+  type:          FieldType
+  label?:        string
+  queryable?:    boolean   // se true, valore duplicato in post_field_index
+  required?:     boolean
+  options?:      string[]  // per type: 'select'
+  fieldOptions?: Record<string, unknown>  // config per 'image', 'relationship'
+  default?:      unknown
 }
 ```
 
-### Classe `PostTypeRegistry`
-- `register(def: PostTypeDefinition): void` — aggiunge al registro
-- `get(name: string): PostTypeDefinition | undefined`
-- `getAll(): PostTypeDefinition[]`
-- `exists(name: string): boolean`
-
-### Post type di default
-Registrati al boot in `bootstrap.ts`:
-```ts
-registry.register({ name: 'post',  label: 'Posts',  icon: 'pi-file' })
-registry.register({ name: 'page',  label: 'Pages',  icon: 'pi-file-text' })
-```
+I valori dei custom fields sono salvati come JSON blob in `posts.fields`. Per campi con `queryable: true`, il valore è anche scritto in `post_field_index` per query filtrate veloci.
 
 ---
 
-## Slug Generation
+## Slug
 
-File: `packages/core/src/post-types/slug.ts`
-
-- `generateSlug(title: string): string` — converte in lowercase, sostituisce spazi con `-`, rimuove caratteri speciali
-- `ensureUniqueSlug(db, postType, baseSlug, excludeId?): Promise<string>` — controlla unicità su `(postType, slug)`, appende `-2`, `-3`, ecc. se necessario
+- **Generazione:** `generateSlug(title)` normalizza, rimuove diacritici, sostituisce spazi con `-`, elimina caratteri speciali.
+- **Unicità:** `ensureUniqueSlug(db, postType, slug, excludeId?)` garantisce l'unicità per `(postType, slug)` — se esiste aggiunge `-2`, `-3`, ecc.
+- Lo slug è auto-generato dal titolo alla creazione; può essere sovrascritto manualmente.
 
 ---
 
-## API Routes — Posts
+## REST API — Posts
 
-Prefisso: `/api/v1/posts`  
-File: `packages/core/src/api/posts.ts`
+Base path: `/api/v1/posts`. Tutte le route richiedono autenticazione Bearer token.
 
 ### `GET /api/v1/posts`
 
-Query params:
-- `type` (obbligatorio) — post type name
-- `status` — `draft` | `published` | `trash` | `any`
-- `[termSlug]` — filtra per taxonomy term (es. `?genre=fantasy`)
-- `[fieldName][gt|lt|eq]` — filtra per campo queryable (es. `?price[lt]=50`)
-- `page`, `limit` — paginazione (default: 20)
-- `orderBy`, `order` — campo e direzione ordinamento
+Elenca post con paginazione e filtri.
 
-Logica query:
-1. Query base su `posts` filtrata per `postType` e `status`
-2. Se filtri su terms: JOIN `post_terms` → `terms` per taxonomy
-3. Se filtri su campi queryable: JOIN `post_field_index` con condizione su colonna tipizzata
-4. Paginazione con OFFSET/LIMIT
-5. Risposta: `{ data: Post[], total, page, limit }`
+**Query params:**
 
-### `GET /api/v1/posts/:idOrSlug`
-- Accetta sia ID numerico che slug
-- Risposta: post completo con `fields` (JSON parsato), lista terms per taxonomy
+| Param | Tipo | Descrizione |
+|---|---|---|
+| `postType` | string | Filtra per post type (obbligatorio in pratica) |
+| `status` | string | `draft`, `published`, `trash` |
+| `page` | number | Pagina (default `1`) |
+| `perPage` | number | Elementi per pagina (default `20`, max `100`) |
+| `search` | string | Ricerca full-text su titolo e slug |
+| `authorId` | number | Filtra per autore |
+| `termSlug` | string | Filtra per term slug della taxonomy |
+| `fieldName[op]` | number/string | Filtra su campo queryable: `price[gt]=100`, `sku[eq]=ABC` |
 
-### `POST /api/v1/posts`
-Richiede auth + capability `edit_posts`.
+**Risposta:** `{ data: Post[], total: number, page: number, perPage: number }`
 
-Body:
-```ts
+### `GET /api/v1/posts/:id`
+
+Restituisce un singolo post con fields parsati e terms raggruppati per taxonomy.
+
+**Risposta:**
+```json
 {
-  postType: string
-  title:    string
-  slug?:    string       // se omesso, generato da title
-  content?: string       // HTML da Tiptap
-  fields?:  Record<string, unknown>
-  status?:  'draft' | 'published'
-  termIds?: number[]
+  "id": 1,
+  "postType": "post",
+  "title": "Hello World",
+  "slug": "hello-world",
+  "content": "<p>...</p>",
+  "fields": { "price": 99.9 },
+  "status": "published",
+  "authorId": 1,
+  "createdAt": 1700000000,
+  "updatedAt": 1700000000,
+  "terms": [
+    { "termId": 1, "termName": "Tech", "termSlug": "tech", "taxonomySlug": "category" }
+  ]
 }
 ```
 
-Logica:
-1. Validare che `postType` esista nel registro
-2. Validare i `fields` contro lo schema del post type
-3. Generare/verificare slug univocità
-4. Inserire in `posts`
-5. Per ogni campo `queryable: true`: inserire in `post_field_index`
-6. Inserire associazioni in `post_terms`
-7. Creare revisione in `post_revisions` (snapshot iniziale)
-8. Risposta: post creato
+### `POST /api/v1/posts`
+
+Crea un nuovo post. Richiede `edit_posts`.
+
+**Body:**
+```json
+{
+  "postType": "post",
+  "title":    "Titolo",
+  "content":  "<p>...</p>",
+  "slug":     "titolo",
+  "status":   "draft",
+  "fields":   {},
+  "termIds":  [1, 2]
+}
+```
+
+- `slug` è opzionale: se omesso viene generato dal titolo
+- `termIds` è opzionale: array di ID dei terms da associare
+
+**Risposta:** `201 Created` con il post creato.
 
 ### `PUT /api/v1/posts/:id`
-Richiede auth + capability `edit_posts` (o `edit_others_posts` se non proprio autore).
 
-Logica:
-1. Fetch post esistente
-2. Validare modifiche
-3. **Creare revisione** dello stato attuale PRIMA di aggiornare
-4. Aggiornare `posts`
-5. Cancellare e riscrivere le righe `post_field_index` per questo post
-6. Aggiornare `post_terms`
-7. Risposta: post aggiornato
+Aggiorna un post esistente. Prima di aggiornare crea una revisione in `post_revisions`.
+
+Richiede `edit_posts` (o `edit_others_posts` per post altrui).
+
+**Body:** stessi campi di POST, tutti opzionali.
+
+**Risposta:** `200 OK` con il post aggiornato.
 
 ### `DELETE /api/v1/posts/:id`
-Richiede auth + capability `delete_posts`.
-- Soft delete: imposta `status = 'trash'`
-- Hard delete (con `?force=true`): elimina fisicamente (cascade su `post_field_index`, `post_revisions`, `post_terms`)
+
+Elimina definitivamente un post. Richiede `delete_posts` (o `delete_others_posts`).
+
+**Risposta:** `204 No Content`
 
 ### `GET /api/v1/posts/:id/revisions`
-Richiede auth.
-Risposta: lista revisioni ordinate per data desc.
 
-### `POST /api/v1/posts/:id/revisions/:revId/restore`
-Richiede auth + capability `edit_posts`.
-Logica:
-1. Fetch revisione
-2. Creare revisione dello stato attuale (per non perderlo)
-3. Sovrascrivere il post con i dati della revisione
-4. Riscrivere `post_field_index`
+Elenca le revisioni di un post in ordine cronologico decrescente.
 
----
+**Risposta:** array di oggetti revisione con `id, title, slug, status, createdAt`.
 
-## Struttura file
+### `POST /api/v1/posts/:id/revisions/:revisionId/restore`
 
-```
-src/post-types/
-├── registry.ts     # PostTypeRegistry class
-├── slug.ts         # generazione e unicità slug
-└── index.ts        # export pubblici
+Ripristina una revisione: il post viene aggiornato con i valori della revisione (e viene creata una nuova revisione dello stato corrente prima del ripristino).
 
-src/api/
-├── posts.ts        # Fastify plugin con tutte le route /posts
-└── index.ts        # registra tutti i route plugin su Fastify
-```
-
----
-
-## Checklist
-
-- [ ] Scrivere interfacce `FieldDefinition`, `PostTypeDefinition`
-- [ ] Implementare `PostTypeRegistry`
-- [ ] Registrare post type default (`post`, `page`) nel bootstrap
-- [ ] Scrivere `generateSlug()` e `ensureUniqueSlug()`
-- [ ] Implementare `GET /posts` con tutti i filtri (incluso queryable fields e terms)
-- [ ] Implementare `GET /posts/:idOrSlug`
-- [ ] Implementare `POST /posts` con validazione campi + scrittura `post_field_index` + revisione
-- [ ] Implementare `PUT /posts/:id` con snapshot revisione pre-aggiornamento
-- [ ] Implementare `DELETE /posts/:id` (soft + hard)
-- [ ] Implementare `GET /posts/:id/revisions`
-- [ ] Implementare `POST /posts/:id/revisions/:revId/restore`
-- [ ] Testare manualmente con un tool HTTP (curl / httpie / Insomnia)
+**Risposta:** `200 OK` con il post aggiornato.

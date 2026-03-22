@@ -1,193 +1,167 @@
-# Modulo 08 — Admin Shell (Vue 3)
+# Admin UI — Panoramica
 
-**Dipendenze:** `01-setup.md`, `07-auth.md`  
-**Produce:** SPA Vue 3 funzionante con layout, routing, auth e client API tipizzato
-
----
-
-## Obiettivo
-
-Creare la struttura base dell'admin: Vite + Vue 3 + Vue Router + Pinia, layout con sidebar dinamica (post type e taxonomies dal server), pagina di login, client API tipizzato.
+Il pannello di amministrazione è una SPA Vue 3 in `packages/admin/`.
 
 ---
 
-## Setup `packages/admin`
+## Tecnologie
 
-### Dipendenze
-```
-vue, vue-router, pinia
-primevue, @primevue/themes, primeicons
-@tiptap/vue-3, @tiptap/starter-kit, @tiptap/extension-link, @tiptap/extension-image
-tailwindcss, @tailwindcss/vite
-typescript, vue-tsc, vite, @vitejs/plugin-vue
-```
-
-### `vite.config.ts`
-- Plugin: `@vitejs/plugin-vue`, `@tailwindcss/vite`
-- Proxy dev: `/api` → `http://localhost:3000/api` (evita CORS in sviluppo)
-- Build output: `../../dist/admin` (servito da Fastify in produzione come static files)
+- **Vue 3** con Composition API e `<script setup>`
+- **Vue Router** con lazy loading delle pagine
+- **Pinia** per lo state management
+- **PrimeVue** per i componenti UI
+- **TailwindCSS** per il layout
+- **Tiptap** per l'editor rich text
 
 ---
 
-## Struttura file
+## Avvio
+
+```bash
+pnpm --filter @phrasepress/admin dev   # dev: http://localhost:5173
+pnpm --filter @phrasepress/admin build # produzione: dist/
+```
+
+Il dev server si aspetta che il core giri su `http://localhost:3000`. Le chiamate API passano tutte per `apiFetch()` in `src/api/client.ts`.
+
+---
+
+## Struttura src/
 
 ```
-packages/admin/src/
-├── main.ts                 # entry point: Vue app, PrimeVue, Pinia, Router
-├── router/
-│   └── index.ts            # Vue Router con route guards
-├── stores/
-│   ├── auth.ts             # Pinia: utente corrente, token, login/logout
-│   └── app.ts              # Pinia: post type e taxonomies caricati dal server
+src/
+├── main.ts              # inizializzazione Vue app + PrimeVue + Pinia
+├── App.vue              # root component, gestisce il session restore
 ├── api/
-│   ├── client.ts           # fetch wrapper con auth header automatico + refresh
-│   ├── posts.ts            # funzioni typed per /api/v1/posts
-│   ├── taxonomies.ts       # funzioni typed per /api/v1/taxonomies
-│   ├── auth.ts             # funzioni typed per /api/v1/auth
-│   ├── users.ts            # funzioni typed per /api/v1/users
-│   └── plugins.ts          # funzioni typed per /api/v1/plugins
+│   ├── client.ts        # apiFetch con auto-refresh JWT
+│   ├── auth.ts          # login, logout, me
+│   ├── posts.ts         # CRUD post
+│   ├── taxonomies.ts    # CRUD terms
+│   ├── users.ts         # CRUD users + roles
+│   ├── media.ts         # upload, list, delete media
+│   ├── fields.ts        # field groups (plugin fields)
+│   ├── forms.ts         # form builder (plugin forms)
+│   ├── mailer.ts        # SMTP config + notifiche (plugin mailer)
+│   └── plugins.ts       # lista + attivazione plugin
+├── stores/
+│   ├── auth.ts          # utente corrente, token, capabilities
+│   ├── app.ts           # post types, taxonomies, plugin attivi
+│   └── theme.ts         # dark/light mode
 ├── layouts/
-│   └── AdminLayout.vue     # sidebar + header + <RouterView>
-└── pages/
-    ├── LoginPage.vue
-    └── DashboardPage.vue
+│   └── AdminLayout.vue  # shell con header, sidebar e <RouterView>
+├── pages/               # una pagina per route (lazy loaded)
+└── components/          # componenti riutilizzabili
 ```
 
 ---
 
-## Router (`router/index.ts`)
+## Navigazione e route
 
-### Route
-| Path | Component | Guard |
+Il router è in `src/router/index.ts`. Tutte le pagine sotto `AdminLayout` richiedono autenticazione. La sidebar mostra solo le voci pertinenti alle capability dell'utente e ai plugin attivi.
+
+| Path | Componente | Capability richiesta |
 |---|---|---|
-| `/login` | `LoginPage` | redirect se già loggato |
-| `/` | `DashboardPage` | requireAuth |
-| `/posts/:type` | `PostListPage` (modulo 09) | requireAuth |
-| `/posts/:type/new` | `PostEditorPage` (modulo 09) | requireAuth |
-| `/posts/:type/:id/edit` | `PostEditorPage` (modulo 09) | requireAuth |
-| `/taxonomy/:slug` | `TermsPage` (modulo 10) | requireAuth |
-| `/users` | `UsersPage` (modulo 11) | requireAuth + capability |
-| `/roles` | `RolesPage` (modulo 11) | requireAuth + capability |
-| `/plugins` | `PluginsPage` (modulo 12) | requireAuth + capability |
+| `/` | DashboardPage | — |
+| `/posts/:type` | PostListPage | — |
+| `/posts/:type/new` | PostEditorPage | — |
+| `/posts/:type/:id/edit` | PostEditorPage | — |
+| `/taxonomy/:slug` | TermsPage | — |
+| `/media` | MediaPage | `upload_files` |
+| `/users` | UsersPage | `manage_users` |
+| `/roles` | RolesPage | `manage_roles` |
+| `/plugins` | PluginsPage | `manage_plugins` |
+| `/field-groups` | FieldGroupsPage | `manage_plugins` |
+| `/field-groups/:id` | FieldGroupEditorPage | `manage_plugins` |
+| `/forms` | FormsPage | `manage_plugins` |
+| `/forms/:id/edit` | FormEditorPage | `manage_plugins` |
+| `/forms/:id/submissions` | FormSubmissionsPage | `manage_plugins` |
+| `/mailer-settings` | MailerSettingsPage | `manage_options` |
+| `/settings` | SettingsPage | — |
+| `/profile` | ProfilePage | — |
 
-### Navigation guard
+---
+
+## Stores Pinia
+
+### `auth` store
+
 ```ts
-router.beforeEach((to) => {
-  const auth = useAuthStore()
-  if (to.meta.requireAuth && !auth.isLoggedIn) return '/login'
+const authStore = useAuthStore()
+
+authStore.user            // utente corrente o null
+authStore.accessToken     // JWT corrente
+authStore.isLoggedIn      // boolean
+authStore.sessionRestored // true dopo fetchMe() al boot
+authStore.hasCapability('manage_users')  // controlla una capability
+authStore.login({ username, password })
+authStore.logout()
+authStore.fetchMe()
+```
+
+### `app` store
+
+```ts
+const appStore = useAppStore()
+
+appStore.postTypes           // PostTypeDefinition[]
+appStore.taxonomies          // TaxonomyDefinition[]
+appStore.isPluginActive('phrasepress-media')  // boolean
+appStore.load()              // carica post types e taxonomie dall'API
+```
+
+---
+
+## API Client
+
+Tutte le chiamate passano per `apiFetch<T>(path, options?)`:
+
+```ts
+import { apiFetch } from '@/api/client.js'
+
+const data = await apiFetch<MyType>('/api/v1/something', {
+  method: 'POST',
+  body:   JSON.stringify(payload),
 })
 ```
 
+- Aggiunge automaticamente l'header `Authorization: Bearer <token>`
+- In caso di `401`: tenta refresh → se fallisce, redirect a `/login`
+- Lancia `ApiError` in caso di risposta HTTP non-ok
+
 ---
 
-## Auth Store (`stores/auth.ts`)
+## Configurazione PhrasePress
+
+Il file `config/phrasepress.config.ts` è l'entry point per personalizzare il sito:
 
 ```ts
-interface AuthState {
-  user:        User | null
-  accessToken: string | null
-}
+import { defineConfig } from '../packages/core/src/config.js'
 
-// Actions
-login(username, password): Promise<void>   // chiama /auth/login, salva token
-logout(): Promise<void>                    // chiama /auth/logout, pulisce stato
-refreshToken(): Promise<void>              // chiama /auth/refresh (usato dal client API)
-fetchMe(): Promise<void>                   // chiama /auth/me per hydrate al reload
+export default defineConfig({
+  postTypes: [
+    {
+      name:  'product',
+      label: 'Products',
+      icon:  'pi-box',
+      fields: [
+        { name: 'price', type: 'number', label: 'Price', queryable: true },
+        { name: 'sku',   type: 'string', label: 'SKU',   queryable: true },
+      ],
+    },
+  ],
+  taxonomies: [
+    {
+      slug:         'genre',
+      name:         'Genres',
+      postTypes:    ['product'],
+      hierarchical: false,
+    },
+  ],
+  plugins: [
+    (await import('../packages/plugins/media/src/index.js')).default,
+    (await import('../packages/plugins/fields/src/index.js')).default,
+    (await import('../packages/plugins/forms/src/index.js')).default,
+    (await import('../packages/plugins/mailer/src/index.js')).default,
+  ],
+})
 ```
-
-Al mount dell'app: chiama `fetchMe()` per verificare se la sessione è ancora valida (l'access token potrebbe essere in memoria, il refresh cookie nel browser).
-
----
-
-## App Store (`stores/app.ts`)
-
-```ts
-interface AppState {
-  postTypes:  PostTypeDefinition[]   // caricati da /api/v1/post-types
-  taxonomies: TaxonomyDefinition[]   // caricati da /api/v1/taxonomies
-}
-```
-
-Caricato una volta dopo il login — popola la sidebar dinamicamente.
-
-> **Nota:** aggiungere `GET /api/v1/post-types` al core (modulo 03) per esporre il registro via API.
-
----
-
-## API Client (`api/client.ts`)
-
-```ts
-async function apiFetch<T>(path: string, options?: RequestInit): Promise<T>
-```
-
-- Aggiunge automaticamente `Authorization: Bearer <token>` dall'auth store
-- Se la risposta è 401: tenta `refreshToken()` e riprova una volta
-- Se il refresh fallisce: redirect a `/login`
-- Gestisce errori JSON unificati: `{ error: string, details?: unknown }`
-
----
-
-## Layout (`AdminLayout.vue`)
-
-```
-┌─────────────────────────────────────────┐
-│  Header: Logo | Username | Logout       │
-├───────────┬─────────────────────────────┤
-│ Sidebar   │                             │
-│           │   <RouterView />            │
-│ Posts ▾   │                             │
-│  ↳ Posts  │                             │
-│  ↳ Pages  │                             │
-│  ↳ [CPT]  │                             │
-│           │                             │
-│ Taxonomy ▾│                             │
-│  ↳ Categ. │                             │
-│  ↳ Tags   │                             │
-│           │                             │
-│ Utenti    │                             │
-│ Ruoli     │                             │
-│ Plugin    │                             │
-└───────────┴─────────────────────────────┘
-```
-
-La sidebar è generata dinamicamente da `appStore.postTypes` e `appStore.taxonomies`.
-
----
-
-## `LoginPage.vue`
-
-- Form: username + password
-- On submit: chiama `authStore.login()`
-- On success: redirect a `/`
-- Mostra errore in caso di credenziali errate
-
----
-
-## `DashboardPage.vue`
-
-- Chiede `GET /api/v1/stats` (da aggiungere al core): conta post per tipo
-- Mostra card per ogni post type con conteggio `published` / `draft`
-
----
-
-## Aggiornamenti al core necessari
-
-- `GET /api/v1/post-types` — lista post type registrati con schema campi
-- `GET /api/v1/stats` — conteggi post per tipo e status
-
----
-
-## Checklist
-
-- [ ] Setup Vite + Vue 3 + PrimeVue + Tailwind in `packages/admin`
-- [ ] Configurare proxy Vite per `/api`
-- [ ] Configurare Vue Router con tutte le route e guard
-- [ ] Implementare `auth` store con Pinia
-- [ ] Implementare `app` store con Pinia
-- [ ] Scrivere `api/client.ts` con auto-refresh
-- [ ] Scrivere funzioni API typed per auth, post types, taxonomies
-- [ ] Implementare `AdminLayout.vue` con sidebar dinamica
-- [ ] Implementare `LoginPage.vue`
-- [ ] Implementare `DashboardPage.vue` con stats
-- [ ] Aggiungere `GET /api/v1/post-types` e `GET /api/v1/stats` al core
-- [ ] Testare: login → sidebar carica post type → logout

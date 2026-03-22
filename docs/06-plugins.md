@@ -1,182 +1,172 @@
-# Modulo 06 — Plugin Loader
+# Plugin System
 
-**Dipendenze:** `05-hooks.md`, `02-database.md`  
-**Produce:** sistema di caricamento e attivazione plugin
-
----
-
-## Obiettivo
-
-Permettere a codice esterno di estendere PhrasePress senza modificare il core. I plugin si registrano nel file di configurazione, vengono caricati al boot e possono aggiungere post type, taxonomy, route API, hook e pagine admin.
+I plugin sono il meccanismo di estensione principale di PhrasePress. Possono aggiungere route API, tabelle DB, hook, e UI nell'admin.
 
 ---
 
 ## Interfaccia Plugin
 
-File: `packages/core/src/plugins/types.ts`
+```ts
+interface Plugin {
+  name:         string     // identificatore univoco, es. 'phrasepress-media'
+  version:      string     // semver, es. '1.0.0'
+  description?: string
+
+  // Chiamato ogni volta che il plugin è attivo all'avvio del server
+  register(ctx: PluginContext): void | Promise<void>
+
+  // Chiamato la prima volta che il plugin viene attivato (setup una-tantum)
+  onActivate?(ctx: PluginContext): void | Promise<void>
+
+  // Chiamato quando il plugin viene disattivato
+  onDeactivate?(ctx: PluginContext): void | Promise<void>
+}
+```
+
+### PluginContext
+
+Oggetto passato a tutti i lifecycle hooks del plugin. Contiene tutto il necessario senza import diretti dal core.
 
 ```ts
 interface PluginContext {
-  hooks:          HookManager
-  postTypes:      PostTypeRegistry
-  taxonomies:     TaxonomyRegistry
-  db:             DrizzleDb
-  fastify:        FastifyInstance
-  config:         PhrasePressConfig
+  hooks:      HookManager        // aggiungi actions e filters
+  postTypes:  PostTypeRegistry   // registra custom post types
+  taxonomies: TaxonomyRegistry   // registra custom taxonomies
+  db:         Db                 // accesso diretto a better-sqlite3 + Drizzle
+  fastify:    FastifyInstance    // monta nuove route
+  config:     PhrasePressConfig  // config utente
 }
-
-interface Plugin {
-  name:        string             // identificatore univoco, es. 'phrasepress-media'
-  version:     string             // semver, es. '1.0.0'
-  description?: string
-  register(ctx: PluginContext): void | Promise<void>
-  onActivate?(ctx: PluginContext):   void | Promise<void>  // chiamato alla prima attivazione
-  onDeactivate?(ctx: PluginContext): void | Promise<void>  // chiamato alla disattivazione
-}
-```
-
----
-
-## Flusso di boot con plugin
-
-```
-1. Caricare config (phrasepress.config.ts)
-2. Init DB + migration + seed
-3. Init registri (PostTypeRegistry, TaxonomyRegistry)
-4. Init HookManager
-5. Registrare post type e taxonomy dal config
-6. Caricare plugin dal config:
-   a. Per ogni plugin: leggere plugin_status dal DB
-   b. Se active = true (o prima attivazione): chiamare plugin.register(ctx)
-7. Sync taxonomies con DB
-8. Avviare Fastify con tutte le route
 ```
 
 ---
 
 ## PluginLoader
 
-File: `packages/core/src/plugins/PluginLoader.ts`
+Il `PluginLoader` gestisce il ciclo di vita dei plugin:
 
-### Metodi
+1. `loadAll()` — eseguito all'avvio del server. Per ogni plugin con status `active = 1` nel DB, chiama `plugin.register(ctx)`.
+2. `activate(pluginName)` — chiama `onActivate()` e imposta `active = 1` nel DB. Non chiama `register()` (il plugin sarà attivo al prossimo boot).
+3. `deactivate(pluginName)` — chiama `onDeactivate()` e imposta `active = 0`.
 
-```ts
-class PluginLoader {
-  constructor(plugins: Plugin[], ctx: PluginContext)
-
-  // Carica tutti i plugin attivi (chiamato al boot)
-  async loadAll(): Promise<void>
-
-  // Attiva un plugin specifico (chiamato dall'admin)
-  async activate(pluginName: string): Promise<void>
-
-  // Disattiva un plugin specifico (chiamato dall'admin)
-  async deactivate(pluginName: string): Promise<void>
-
-  // Lista tutti i plugin registrati con il loro stato nel DB
-  async getStatus(): Promise<PluginStatus[]>
-}
-```
-
-### `loadAll()`
-1. Per ogni plugin nel config: controlla se `active = true` in `plugin_status`
-2. Se il plugin non ha ancora un record in `plugin_status`, lo inserisce come `active = false`
-3. Per i plugin attivi: chiama `plugin.register(ctx)`
-4. Gli errori di un singolo plugin non devono bloccare il boot degli altri — loggare e continuare
-
-### `activate(name)`
-1. Trova il plugin per nome
-2. Se il plugin ha `onActivate`: chiamarlo
-3. Impostare `active = 1` in `plugin_status`
-
-### `deactivate(name)`
-1. Trova il plugin attivo per nome
-2. Se il plugin ha `onDeactivate`: chiamarlo
-3. Impostare `active = 0` in `plugin_status`
-4. **Nota:** la deattivazione non fa "rollback" di hook o post type già registrati. Richiede un riavvio del server per avere effetto completo (comportamento accettabile, come in WP).
+**Isolation**: se `register()` lancia un errore, il plugin viene saltato senza bloccare il boot degli altri.
 
 ---
 
-## API Routes — Plugins
+## Registrare un plugin
 
-Prefisso: `/api/v1/plugins`  
-Richiede auth + capability `manage_plugins`
-
-### `GET /api/v1/plugins`
-Risposta: lista di tutti i plugin nel config con il loro stato (active/inactive), nome, versione, descrizione.
-
-### `POST /api/v1/plugins/:name/activate`
-Chiama `loader.activate(name)`. Risposta: `{ success: true, requiresRestart: false }`.
-
-### `POST /api/v1/plugins/:name/deactivate`
-Chiama `loader.deactivate(name)`. Risposta: `{ success: true, requiresRestart: true }` (la deattivazione richiede restart per pulizia completa).
-
----
-
-## Esempio plugin completo
+In `config/phrasepress.config.ts`:
 
 ```ts
-// packages/plugins/custom-fields-ui/src/index.ts
-import type { Plugin } from '@phrasepress/core'
-
-const plugin: Plugin = {
-  name: 'custom-fields-ui',
-  version: '1.0.0',
-  description: 'Aggiunge un tipo campo "color picker" al sistema custom fields',
-
-  register({ hooks, postTypes }) {
-    // Aggiunge un field type custom all'editor admin
-    hooks.addFilter('admin.fieldTypes', (types) => [
-      ...types,
-      { type: 'color', component: 'ColorPickerField' }
-    ])
-  }
-}
-
-export default plugin
-```
-
----
-
-## Configurazione nel config utente
-
-```ts
-// config/phrasepress.config.ts
-import mediaPlugin from '@phrasepress/plugin-media'
-import myPlugin    from '../packages/plugins/my-plugin/src/index.ts'
+import { defineConfig } from '../packages/core/src/config.js'
 
 export default defineConfig({
   plugins: [
-    mediaPlugin,
-    myPlugin,
-  ]
+    (await import('../packages/plugins/media/src/index.js')).default,
+    (await import('../packages/plugins/fields/src/index.js')).default,
+    // plugin custom
+    (await import('../packages/my-plugin/src/index.js')).default,
+  ],
 })
 ```
 
 ---
 
-## Struttura file
+## Creare un plugin
+
+### Struttura directory
 
 ```
-src/plugins/
-├── types.ts        # interfacce Plugin, PluginContext, PluginStatus
-├── PluginLoader.ts # caricamento, attivazione, disattivazione
-└── index.ts        # export pubblici
+packages/plugins/my-plugin/
+├── package.json
+├── tsconfig.json
+└── src/
+    ├── index.ts      # entry point — esporta l'oggetto Plugin
+    ├── db.ts         # schema Drizzle + CRUD (se usa DB)
+    └── routes.ts     # route Fastify (se espone API)
+```
 
-src/api/
-├── plugins.ts      # route /plugins
+### package.json
+
+```json
+{
+  "name": "@phrasepress/plugin-my-plugin",
+  "version": "1.0.0",
+  "type": "module",
+  "main": "src/index.ts",
+  "dependencies": {
+    "@phrasepress/core": "workspace:*"
+  }
+}
+```
+
+### Esempio minimo
+
+```ts
+// src/index.ts
+import type { Plugin, PluginContext } from '@phrasepress/core'
+
+const myPlugin: Plugin = {
+  name:        'my-plugin',
+  version:     '1.0.0',
+  description: 'Il mio plugin custom',
+
+  async onActivate(ctx: PluginContext) {
+    // Crea tabelle DB, seed iniziale, etc.
+    // Eseguito solo alla prima attivazione
+    const client = (ctx.db as any).$client
+    client.exec(`
+      CREATE TABLE IF NOT EXISTS my_plugin_data (
+        id   INTEGER PRIMARY KEY AUTOINCREMENT,
+        data TEXT NOT NULL
+      )
+    `)
+  },
+
+  async register(ctx: PluginContext) {
+    // Monta route API
+    await ctx.fastify.register(async (app) => {
+      app.get('/hello', { preHandler: [ctx.fastify.authenticate] }, async () => {
+        return { message: 'Hello from my plugin!' }
+      })
+    }, { prefix: '/api/v1/plugins/my-plugin' })
+
+    // Aggancia hook
+    ctx.hooks.addAction('form.submitted', async (payload) => {
+      console.log('Form submitted:', payload)
+    })
+  },
+}
+
+export default myPlugin
 ```
 
 ---
 
-## Checklist
+## API REST — Plugins
 
-- [ ] Scrivere interfacce `Plugin`, `PluginContext`, `PluginStatus`
-- [ ] Implementare `PluginLoader.loadAll()` con error isolation
-- [ ] Implementare `PluginLoader.activate()` e `deactivate()`
-- [ ] Implementare `PluginLoader.getStatus()`
-- [ ] Integrare `PluginLoader` nel bootstrap (dopo registri, prima di Fastify start)
-- [ ] Implementare route `GET /plugins`
-- [ ] Implementare route `POST /plugins/:name/activate` e `deactivate`
-- [ ] Scrivere un plugin di esempio funzionante in `packages/plugins/example/`
-- [ ] Testare: registrare plugin, attivarlo, verificare che il suo hook venga eseguito
+Base path: `/api/v1/plugins`. Richiedono `manage_plugins`.
+
+### `GET /api/v1/plugins`
+
+Elenca tutti i plugin registrati in config con il loro status.
+
+**Risposta:**
+```json
+[
+  {
+    "name": "phrasepress-media",
+    "version": "1.0.0",
+    "description": "...",
+    "active": true,
+    "activatedAt": 1700000000
+  }
+]
+```
+
+### `POST /api/v1/plugins/:name/activate`
+
+Attiva un plugin (chiama `onActivate` se prima volta).
+
+### `POST /api/v1/plugins/:name/deactivate`
+
+Disattiva un plugin (chiama `onDeactivate`).

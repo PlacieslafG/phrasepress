@@ -1,82 +1,147 @@
-# Modulo 12 — Admin: Gestione Plugin
+# Plugin Built-in
 
-**Dipendenze:** `08-admin-shell.md`, `06-plugins.md`  
-**Produce:** pagina per attivare/disattivare plugin installati
-
----
-
-## Obiettivo
-
-Fornire all'amministratore una vista chiara dei plugin disponibili e la possibilità di attivarli o disattivarli senza toccare il codice.
+PhrasePress include quattro plugin nel repository, tutti attivabili dalla pagina Plugin dell'admin.
 
 ---
 
-## `PluginsPage.vue`
+## phrasepress-media
 
-Route: `/plugins`  
-Richiede capability: `manage_plugins`
+Gestisce l'upload e la libreria media (immagini, PDF, ecc.).
 
-### Layout
+### Funzionalità
+- Upload multiplo di file tramite multipart form
+- Libreria media a griglia nella pagina `/media`
+- `MediaPickerDialog.vue` per selezionare immagini nei post
+- File serviti staticamente da `/uploads/`
 
+### API
 ```
-┌──────────────────────────────────────────────────────────┐
-│ Plugin                                                   │
-├──────────────────────────────────────────────────────────┤
-│ ┌─ phrasepress-media ────────────────── ● ATTIVO ──────┐ │
-│ │ v1.0.0 — Media Library                               │ │
-│ │ Aggiunge upload e gestione file media al CMS.        │ │
-│ │                                      [Disattiva]     │ │
-│ └──────────────────────────────────────────────────────┘ │
-│                                                          │
-│ ┌─ custom-fields-ui ─────────────────── ○ INATTIVO ───┐ │
-│ │ v0.2.0 — Custom Field Types extra                   │ │
-│ │ Aggiunge tipi di campo: color picker, range slider. │ │
-│ │                                       [Attiva]      │ │
-│ └──────────────────────────────────────────────────────┘ │
-└──────────────────────────────────────────────────────────┘
+POST   /api/v1/plugins/phrasepress-media/upload    # upload file (multipart)
+GET    /api/v1/plugins/phrasepress-media/media      # lista file
+DELETE /api/v1/plugins/phrasepress-media/media/:id  # elimina file
 ```
 
-### Comportamento
-
-- La lista è caricata da `GET /api/v1/plugins`: ritorna tutti i plugin nel config con il loro stato
-- Per ogni plugin: badge colorato (verde = attivo, grigio = inattivo), pulsante contestuale
-
-#### Attivazione
-1. Click "Attiva" → `POST /api/v1/plugins/:name/activate`
-2. On success: aggiorna stato in lista (ottimista: prima aggiorna UI, poi ricarica)
-3. Mostra toast: "Plugin attivato. Ricarica la pagina per vedere le nuove funzionalità."
-4. **Non** richiedere riavvio del server — l'attivazione è effective immediatamente (il plugin era già caricato in memoria, `onActivate` viene chiamato ora)
-
-#### Disattivazione
-1. Click "Disattiva" → dialog di conferma: "Il plugin verrà disattivato. Alcune funzionalità potrebbero smettere di funzionare. Richiede riavvio del server per rimozione completa."
-2. `POST /api/v1/plugins/:name/deactivate`
-3. On success: aggiorna stato, mostra banner giallo: "Plugin disattivato. Riavvia il server per la rimozione completa dei suoi hook."
-
-### Card plugin
-
-Informazioni mostrate per ogni plugin:
-- Nome (da `plugin.name`)
-- Versione (da `plugin.version`)
-- Descrizione (da `plugin.description`)
-- Stato (badge)
-- Pulsante azione
+### Tabella DB: `pp_media`
+| Colonna | Tipo | Note |
+|---|---|---|
+| `id` | TEXT PK | UUID |
+| `filename` | TEXT | nome file originale |
+| `path` | TEXT | percorso relativo in uploads/ |
+| `mime_type` | TEXT | es. `image/jpeg` |
+| `size` | INTEGER | byte |
+| `alt` | TEXT | testo alternativo |
+| `created_at` | INTEGER | Unix timestamp |
 
 ---
 
-## Note implementative
+## phrasepress-fields
 
-- I plugin sono **registrati nel config dell'utente** (`phrasepress.config.ts`), non installabili dall'admin tramite upload. L'admin gestisce solo attivazione/disattivazione.
-- Non è previsto un marketplace o download automatico nell'MVP.
-- Se un plugin causa un errore al `register()`, il suo stato resta "inattivo" e viene mostrato un badge rosso "Errore" con il messaggio.
+Permette di definire **gruppi di campi custom** dall'interfaccia admin, senza toccare il codice.
+
+### Funzionalità
+- Crea field group con nome e condizioni di applicazione (post type)
+- Drag & drop per riordinare i campi
+- Tipi supportati: text, textarea, number, select, checkbox, date, image, relationship, repeater
+- I gruppi attivi appaiono automaticamente nell'editor dei post corrispondenti
+
+### API
+```
+GET    /api/v1/plugins/phrasepress-fields/field-groups
+POST   /api/v1/plugins/phrasepress-fields/field-groups
+GET    /api/v1/plugins/phrasepress-fields/field-groups/:id
+PUT    /api/v1/plugins/phrasepress-fields/field-groups/:id
+DELETE /api/v1/plugins/phrasepress-fields/field-groups/:id
+```
 
 ---
 
-## Checklist
+## phrasepress-forms
 
-- [ ] Implementare `PluginsPage.vue` con lista card
-- [ ] Mostrare nome, versione, descrizione, stato per ogni plugin
-- [ ] Collegare pulsante "Attiva" con `POST /plugins/:name/activate`
-- [ ] Collegare pulsante "Disattiva" con dialog conferma + `POST /plugins/:name/deactivate`
-- [ ] Mostrare toast/banner con indicazioni post-attivazione/disattivazione
-- [ ] Gestire stato "Errore" per plugin che hanno fallito la registrazione
-- [ ] Testare con il plugin di esempio del modulo 06
+Builder per form pubblici con raccolta submission.
+
+### Funzionalità admin
+- Crea/modifica form con campi personalizzati
+- Tipi campi: text, email, textarea, number, select, checkbox, date
+- Visualizza le submission ricevute con colonne dinamiche per campo
+- Elimina singole submission
+
+### API admin (richiede `manage_plugins`)
+```
+GET    /api/v1/plugins/phrasepress-forms/forms
+POST   /api/v1/plugins/phrasepress-forms/forms
+PUT    /api/v1/plugins/phrasepress-forms/forms/:id
+DELETE /api/v1/plugins/phrasepress-forms/forms/:id
+GET    /api/v1/plugins/phrasepress-forms/forms/:id/submissions
+DELETE /api/v1/plugins/phrasepress-forms/submissions/:id
+```
+
+### API pubblica (no autenticazione)
+```
+GET  /api/v1/plugins/phrasepress-forms/public/forms/:slug    # schema form
+POST /api/v1/plugins/phrasepress-forms/public/submit/:slug   # invia submission
+```
+
+### Esempio: incorporare un form in HTML
+```html
+<form id="contact-form">
+  <input name="nome" required placeholder="Nome">
+  <input type="email" name="email" required placeholder="Email">
+  <textarea name="messaggio" placeholder="Messaggio"></textarea>
+  <button type="submit">Invia</button>
+</form>
+<script>
+document.getElementById('contact-form').addEventListener('submit', async (e) => {
+  e.preventDefault()
+  const data = Object.fromEntries(new FormData(e.target))
+  await fetch('/api/v1/plugins/phrasepress-forms/public/submit/contact', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  })
+})
+</script>
+```
+
+### Hook emesso
+```ts
+// Payload available in ctx.hooks.addAction('form.submitted', handler)
+{
+  form: { id: string; name: string; fields: FormField[] },
+  submission: { id: string; data: string /* JSON */ }
+}
+```
+
+---
+
+## phrasepress-mailer
+
+Invia email di notifica quando viene ricevuta una submission di un form.
+
+### Funzionalità
+- Configurazione SMTP (host, porta, TLS, credenziali)
+- Regole di notifica per-form: email destinatario, template oggetto
+- Invio email di test dalla pagina impostazioni
+- Corpo email HTML generato automaticamente con tutti i campi della submission
+
+### API admin (richiede `manage_options`)
+```
+GET  /api/v1/plugins/phrasepress-mailer/settings         # config SMTP (senza password)
+PUT  /api/v1/plugins/phrasepress-mailer/settings         # aggiorna config
+POST /api/v1/plugins/phrasepress-mailer/test             # invia email di test
+GET  /api/v1/plugins/phrasepress-mailer/notifications    # regole di notifica
+POST /api/v1/plugins/phrasepress-mailer/notifications    # crea regola
+PUT  /api/v1/plugins/phrasepress-mailer/notifications/:id
+DELETE /api/v1/plugins/phrasepress-mailer/notifications/:id
+```
+
+**Nota sicurezza:** la password SMTP non viene mai restituita dall'API. `GET /settings` restituisce `hasPassword: boolean`. Per aggiornare la password inviare il campo `authPass` nel `PUT /settings`; omettendo il campo o inviando stringa vuota, la password esistente viene preservata.
+
+### Template oggetto
+Usare `{form_name}` come placeholder:
+```
+Nuova submission: {form_name}
+```
+
+### Tabelle DB
+- `pp_mailer_config` — configurazione SMTP (riga singola con id='default')
+- `pp_mailer_notifications` — regole per-form
