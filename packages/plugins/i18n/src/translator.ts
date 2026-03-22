@@ -77,11 +77,17 @@ function buildUserMessage(
     .replace('{text}',             text)
 }
 
+// Timeout default per le traduzioni: 120s (i modelli LLM grandi sono lenti)
+// Timeout per il test di connessione: 30s
+const DEFAULT_TIMEOUT_MS = 120_000
+const TEST_TIMEOUT_MS    = 30_000
+
 export async function translateText(
   config: TranslatorConfig,
   text:   string,
   targetLocale: string,
   isHtml = false,
+  timeoutMs = DEFAULT_TIMEOUT_MS,
 ): Promise<string> {
   if (!text.trim()) return text   // non chiamare l'LLM per testi vuoti
 
@@ -107,11 +113,15 @@ export async function translateText(
     headers['Authorization'] = `Bearer ${config.apiKey}`
   }
 
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), timeoutMs)
+
   let response: Response
   try {
     response = await fetch(url, {
       method: 'POST',
       headers,
+      signal: controller.signal,
       body: JSON.stringify({
         model:       config.model,
         temperature: 0.2,        // bassa creatività = traduzioni consistenti e accurate
@@ -122,7 +132,12 @@ export async function translateText(
       }),
     })
   } catch (err) {
+    if (err instanceof Error && err.name === 'AbortError') {
+      throw new TranslatorError(`LLM request timed out after ${timeoutMs / 1000}s`)
+    }
     throw new TranslatorError(`LLM request failed: ${String(err)}`, err)
+  } finally {
+    clearTimeout(timer)
   }
 
   if (!response.ok) {
@@ -183,6 +198,8 @@ export async function testConnection(config: TranslatorConfig): Promise<{ ok: bo
       config,
       'Hello, this is a connection test.',
       testLocale,
+      false,
+      TEST_TIMEOUT_MS,
     )
     return { ok: true, message: `Connection OK — "${result}" (${localeName(config.sourceLocale)} → ${localeName(testLocale)})` }
   } catch (err) {
