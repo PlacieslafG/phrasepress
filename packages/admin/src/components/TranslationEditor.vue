@@ -1,33 +1,5 @@
 <template>
-  <div class="flex flex-col gap-4 pt-2">
-    <!-- Barra azioni -->
-    <div class="flex items-center gap-2">
-      <Button
-        label="Auto-traduci"
-        icon="pi pi-sparkles"
-        size="small"
-        severity="secondary"
-        :loading="translating"
-        @click="autoTranslate"
-      />
-      <Button
-        label="Salva"
-        icon="pi pi-save"
-        size="small"
-        :loading="saving"
-        @click="save"
-      />
-      <Button
-        v-if="translation"
-        icon="pi pi-trash"
-        severity="danger"
-        text
-        size="small"
-        class="ml-auto"
-        @click="confirmDelete"
-      />
-    </div>
-
+  <div class="flex flex-col gap-4">
     <!-- Titolo -->
     <div class="flex flex-col gap-1">
       <label class="text-xs font-medium text-surface-500">Titolo *</label>
@@ -56,7 +28,7 @@
           v-if="def.type === 'string'"
           :model-value="strVal(def.name)"
           class="w-full"
-          @update:model-value="setField(def.name, $event)"
+          @update:model-value="setField(def.name, $event ?? '')"
         />
         <Textarea
           v-else-if="def.type === 'textarea'"
@@ -64,7 +36,7 @@
           :rows="3"
           auto-resize
           class="w-full"
-          @update:model-value="setField(def.name, $event)"
+          @update:model-value="setField(def.name, $event ?? '')"
         />
         <RichTextEditor
           v-else-if="def.type === 'richtext'"
@@ -83,6 +55,35 @@
         option-label="label"
         option-value="value"
         class="w-full"
+      />
+    </div>
+
+    <!-- Azioni — in fondo al form -->
+    <div class="flex items-center gap-2 pt-2 border-t border-surface-700 mt-auto">
+      <Button
+        label="Auto-traduci"
+        icon="pi pi-sparkles"
+        size="small"
+        severity="secondary"
+        outlined
+        :loading="translating"
+        @click="autoTranslate"
+      />
+      <Button
+        label="Salva"
+        icon="pi pi-save"
+        size="small"
+        :loading="saving"
+        class="ml-auto"
+        @click="save"
+      />
+      <Button
+        v-if="translation"
+        icon="pi pi-trash"
+        severity="danger"
+        text
+        size="small"
+        @click="confirmDelete"
       />
     </div>
   </div>

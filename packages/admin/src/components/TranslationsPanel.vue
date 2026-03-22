@@ -1,60 +1,97 @@
 <template>
-  <div class="flex flex-col gap-3">
-    <!-- Intestazione con "Traduci tutto" -->
-    <div class="flex items-center justify-between">
-      <span class="text-xs text-surface-400">{{ locales.length }} lingue configurate</span>
-      <Button
-        v-if="locales.length > 0"
-        label="Traduci tutto"
-        icon="pi pi-language"
-        size="small"
-        text
-        :loading="translatingAll"
-        @click="translateAll"
-      />
-    </div>
+  <div class="flex flex-col gap-2">
 
-    <div v-if="loadingLocales" class="text-surface-400 text-xs">Caricamento...</div>
+    <div v-if="loadingLocales" class="text-surface-400 text-xs py-1">Caricamento...</div>
 
-    <div v-else-if="locales.length === 0" class="text-surface-400 text-xs">
+    <div v-else-if="locales.length === 0" class="text-surface-400 text-xs py-1">
       Nessuna lingua configurata.
       <RouterLink to="/i18n" class="text-primary-500 hover:underline">Configura le lingue</RouterLink>
     </div>
 
-    <!-- Lista lingue — accordion -->
-    <Accordion v-else :multiple="false" :value="expandedLocale" @update:value="(v) => expandedLocale = v as string">
-      <AccordionPanel
+    <template v-else>
+      <!-- Riga per ogni lingua -->
+      <div
         v-for="locale in locales"
         :key="locale.code"
-        :value="locale.code"
+        class="flex items-center gap-2 py-1.5 px-2 rounded-lg hover:bg-surface-800 transition-colors group"
       >
-        <AccordionHeader>
-          <div class="flex items-center gap-2 w-full">
-            <span class="font-medium text-sm">{{ locale.label }}</span>
-            <code class="text-xs text-surface-400">({{ locale.code }})</code>
-            <div class="ml-auto mr-2">
-              <Tag
-                v-if="getTranslation(locale.code)"
-                :value="getTranslation(locale.code)!.isDirty ? 'Obsoleta' : 'Tradotta'"
-                :severity="getTranslation(locale.code)!.isDirty ? 'warn' : 'success'"
-                class="text-xs"
-              />
-              <Tag v-else value="Mancante" severity="secondary" class="text-xs" />
-            </div>
-          </div>
-        </AccordionHeader>
-        <AccordionContent>
-          <TranslationEditor
-            :locale="locale"
-            :post-id="postId"
-            :translation="getTranslation(locale.code) ?? null"
-            :translatable-field-defs="translatableFieldDefs"
-            @saved="onTranslationSaved"
-            @deleted="onTranslationDeleted(locale.code)"
+        <!-- Nome lingua + codice -->
+        <div class="flex flex-col min-w-0 flex-1">
+          <span class="text-sm font-medium leading-tight truncate">{{ locale.label }}</span>
+          <code class="text-xs text-surface-500">{{ locale.code }}</code>
+        </div>
+
+        <!-- Badge status -->
+        <Tag
+          v-if="getTranslation(locale.code)"
+          :value="getTranslation(locale.code)!.isDirty ? 'Obsoleta' : 'Tradotta'"
+          :severity="getTranslation(locale.code)!.isDirty ? 'warn' : 'success'"
+          class="text-xs shrink-0"
+        />
+        <Tag v-else value="Mancante" severity="secondary" class="text-xs shrink-0" />
+
+        <!-- Azioni -->
+        <div class="flex gap-1 shrink-0">
+          <Button
+            v-tooltip.top="'Auto-traduci'"
+            icon="pi pi-sparkles"
+            size="small"
+            text
+            severity="secondary"
+            :loading="translatingLocale === locale.code"
+            class="w-7 h-7"
+            @click="autoTranslateSingle(locale)"
           />
-        </AccordionContent>
-      </AccordionPanel>
-    </Accordion>
+          <Button
+            v-tooltip.top="'Modifica traduzione'"
+            icon="pi pi-pencil"
+            size="small"
+            text
+            severity="secondary"
+            class="w-7 h-7"
+            @click="openDrawer(locale)"
+          />
+        </div>
+      </div>
+
+      <!-- "Traduci tutto" in fondo -->
+      <div class="pt-1 border-t border-surface-700">
+        <Button
+          label="Traduci tutto"
+          icon="pi pi-language"
+          size="small"
+          text
+          fluid
+          :loading="translatingAll"
+          @click="translateAll"
+        />
+      </div>
+    </template>
+
+    <!-- Drawer per l'editor della traduzione -->
+    <Drawer
+      v-model:visible="drawerVisible"
+      position="right"
+      :style="{ width: 'min(560px, 92vw)' }"
+      :pt="{ header: { class: 'border-b border-surface-700 pb-3' } }"
+    >
+      <template #header>
+        <div class="flex flex-col gap-0.5">
+          <span class="font-semibold">{{ selectedLocale?.label }}</span>
+          <code class="text-xs text-surface-400 font-normal">{{ selectedLocale?.code }}</code>
+        </div>
+      </template>
+
+      <TranslationEditor
+        v-if="selectedLocale"
+        :locale="selectedLocale"
+        :post-id="postId"
+        :translation="getTranslation(selectedLocale.code) ?? null"
+        :translatable-field-defs="translatableFieldDefs"
+        @saved="onTranslationSaved"
+        @deleted="onTranslationDeleted(selectedLocale.code)"
+      />
+    </Drawer>
   </div>
 </template>
 
@@ -87,14 +124,23 @@ const translatableFieldDefs = computed(() =>
 )
 
 // ── Data ──────────────────────────────────────────────────────────────────────
-const locales        = ref<Locale[]>([])
-const translations   = ref<Translation[]>([])
-const loadingLocales = ref(false)
-const expandedLocale = ref<string | undefined>(undefined)
-const translatingAll = ref(false)
+const locales         = ref<Locale[]>([])
+const translations    = ref<Translation[]>([])
+const loadingLocales  = ref(false)
+const translatingAll  = ref(false)
+const translatingLocale = ref<string | null>(null)
+
+// Drawer
+const drawerVisible  = ref(false)
+const selectedLocale = ref<Locale | null>(null)
 
 function getTranslation(locale: string): Translation | undefined {
   return translations.value.find(t => t.locale === locale)
+}
+
+function openDrawer(locale: Locale) {
+  selectedLocale.value = locale
+  drawerVisible.value  = true
 }
 
 async function load() {
@@ -121,6 +167,21 @@ function onTranslationSaved(t: Translation) {
 
 function onTranslationDeleted(locale: string) {
   translations.value = translations.value.filter(t => t.locale !== locale)
+  drawerVisible.value = false
+}
+
+async function autoTranslateSingle(locale: Locale) {
+  translatingLocale.value = locale.code
+  try {
+    const t = await i18nApi.autoTranslate(props.postId, locale.code)
+    onTranslationSaved(t)
+    toast.add({ severity: 'success', summary: `${locale.label} tradotta`, life: 2500 })
+  } catch (err: unknown) {
+    const msg = (err as { message?: string })?.message ?? 'Errore traduzione'
+    toast.add({ severity: 'error', summary: 'Traduzione fallita', detail: msg, life: 4000 })
+  } finally {
+    translatingLocale.value = null
+  }
 }
 
 async function translateAll() {
@@ -128,9 +189,7 @@ async function translateAll() {
   try {
     const results = await i18nApi.autoTranslateAll(props.postId)
     for (const r of results) {
-      if (r.ok && r.translation) {
-        onTranslationSaved(r.translation)
-      }
+      if (r.ok && r.translation) onTranslationSaved(r.translation)
     }
     const failures = results.filter(r => !r.ok)
     if (failures.length === 0) {
