@@ -1,17 +1,20 @@
 <template>
-  <div class="flex flex-col gap-2">
-    <p class="text-sm font-medium">{{ taxonomy.name }}</p>
+  <div class="flex flex-col gap-1">
 
-    <!-- Gerarchico: Tree con checkbox -->
-    <TreeSelect
-      v-if="taxonomy.hierarchical"
-      v-model="selected"
-      :options="treeNodes"
-      selection-mode="checkbox"
-      placeholder="Nessun termine selezionato"
-      class="w-full"
-      @update:model-value="emitChange"
-    />
+    <!-- Gerarchico: lista di checkbox inline (no dropdown, no overflow) -->
+    <template v-if="taxonomy.hierarchical">
+      <div v-if="allTerms.length === 0" class="text-xs text-surface-400 py-1">Nessun termine</div>
+      <div v-else class="flex flex-col gap-0.5 max-h-48 overflow-y-auto">
+        <TermCheckboxRow
+          v-for="term in allTerms"
+          :key="term.id"
+          :term="term"
+          :selected-ids="selectedIds"
+          :depth="0"
+          @toggle="toggleTerm"
+        />
+      </div>
+    </template>
 
     <!-- Flat: MultiSelect -->
     <MultiSelect
@@ -29,8 +32,8 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onMounted } from 'vue'
-import type { TreeNode } from 'primevue/treenode'
+import { ref, computed, watch, onMounted, defineComponent, h } from 'vue'
+import Checkbox from 'primevue/checkbox'
 import { taxonomiesApi } from '@/api/taxonomies.js'
 import type { TaxonomyDefinition, TermWithChildren } from '@/api/taxonomies.js'
 
@@ -41,16 +44,10 @@ const props = defineProps<{
 
 const emit = defineEmits<{ 'update:selectedIds': [ids: number[]] }>()
 
-const allTerms = ref<TermWithChildren[]>([])
-
-// Per TreeSelect: mappa { [key]: { checked, partialChecked } }
-const selected     = ref<Record<string, { checked: boolean; partialChecked: boolean }>>({})
-// Per MultiSelect: array di id
+const allTerms     = ref<TermWithChildren[]>([])
 const selectedFlat = ref<number[]>([...props.selectedIds])
 
-// Nodi per TreeSelect
-const treeNodes = computed<TreeNode[]>(() => termToNodes(allTerms.value))
-// Lista piatta per MultiSelect
+// Flat list for MultiSelect
 const flatTerms = computed(() => flattenTerms(allTerms.value))
 
 function flattenTerms(terms: TermWithChildren[]): { id: number; name: string }[] {
@@ -62,23 +59,12 @@ function flattenTerms(terms: TermWithChildren[]): { id: number; name: string }[]
   return result
 }
 
-function termToNodes(terms: TermWithChildren[]): TreeNode[] {
-  return terms.map((t) => ({
-    key:      String(t.id),
-    label:    t.name,
-    children: termToNodes(t.children ?? []),
-  }))
-}
-
-function buildSelected(ids: number[]): Record<string, { checked: boolean; partialChecked: boolean }> {
-  return Object.fromEntries(ids.map((id) => [String(id), { checked: true, partialChecked: false }]))
-}
-
-function emitChange(val: Record<string, { checked: boolean; partialChecked: boolean }>) {
-  const ids = Object.entries(val)
-    .filter(([, v]) => v.checked)
-    .map(([k]) => Number(k))
-  emit('update:selectedIds', ids)
+function toggleTerm(id: number) {
+  const idx = props.selectedIds.indexOf(id)
+  const next = idx >= 0
+    ? props.selectedIds.filter(x => x !== id)
+    : [...props.selectedIds, id]
+  emit('update:selectedIds', next)
 }
 
 function emitFlatChange(ids: number[]) {
@@ -88,12 +74,47 @@ function emitFlatChange(ids: number[]) {
 onMounted(async () => {
   try {
     allTerms.value = await taxonomiesApi.getTerms(props.taxonomy.slug)
-  } catch { /* silenzioso - terms semplicemente vuoti */ }
+  } catch { /* silenzioso */ }
 })
 
-// Sync props → stato locale
 watch(() => props.selectedIds, (ids) => {
-  selected.value     = buildSelected(ids)
   selectedFlat.value = [...ids]
 }, { immediate: true })
+
+// ── Recursive checkbox row component ──────────────────────────────────────────
+const TermCheckboxRow = defineComponent({
+  name: 'TermCheckboxRow',
+  props: {
+    term:        { type: Object as () => TermWithChildren, required: true },
+    selectedIds: { type: Array as () => number[],          required: true },
+    depth:       { type: Number,                           default: 0 },
+  },
+  emits: ['toggle'],
+  setup(p, { emit: emitRow }) {
+    const checked = computed(() => p.selectedIds.includes(p.term.id))
+    return () => h('div', { class: 'flex flex-col' }, [
+      h('label', {
+        class: 'flex items-center gap-2 py-1 px-1 rounded cursor-pointer hover:bg-surface-800 select-none',
+        style: { paddingLeft: `${p.depth * 16 + 4}px` },
+        onClick: () => emitRow('toggle', p.term.id),
+      }, [
+        h(Checkbox, {
+          modelValue: checked.value,
+          binary: true,
+          class: 'pointer-events-none shrink-0',
+          'onUpdate:modelValue': () => {},
+        }),
+        h('span', { class: 'text-sm truncate' }, p.term.name),
+      ]),
+      ...(p.term.children ?? []).map(child =>
+        h(TermCheckboxRow, {
+          term:        child,
+          selectedIds: p.selectedIds,
+          depth:       p.depth + 1,
+          onToggle:    (id: number) => emitRow('toggle', id),
+        })
+      ),
+    ])
+  },
+})
 </script>
