@@ -13,25 +13,25 @@
       <div
         v-for="locale in locales"
         :key="locale.code"
-        class="flex items-center gap-2 py-1.5 px-2 rounded-lg hover:bg-surface-800 transition-colors group"
+        class="flex items-center gap-2 py-1.5 px-1 rounded-lg hover:bg-surface-800 transition-colors"
       >
-        <!-- Nome lingua + codice -->
-        <div class="flex flex-col min-w-0 flex-1">
+        <!-- Badge + nome su unica colonna -->
+        <div class="flex flex-col min-w-0 flex-1 gap-0.5">
           <span class="text-sm font-medium leading-tight truncate">{{ locale.label }}</span>
-          <code class="text-xs text-surface-500">{{ locale.code }}</code>
+          <div class="flex items-center gap-1.5">
+            <code class="text-xs text-surface-500">{{ locale.code }}</code>
+            <Tag
+              v-if="getTranslation(locale.code)"
+              :value="getTranslation(locale.code)!.isDirty ? 'Obsoleta' : 'Tradotta'"
+              :severity="getTranslation(locale.code)!.isDirty ? 'warn' : 'success'"
+              class="!text-[10px] !py-0 !px-1.5"
+            />
+            <Tag v-else value="—" severity="secondary" class="!text-[10px] !py-0 !px-1.5" />
+          </div>
         </div>
 
-        <!-- Badge status -->
-        <Tag
-          v-if="getTranslation(locale.code)"
-          :value="getTranslation(locale.code)!.isDirty ? 'Obsoleta' : 'Tradotta'"
-          :severity="getTranslation(locale.code)!.isDirty ? 'warn' : 'success'"
-          class="text-xs shrink-0"
-        />
-        <Tag v-else value="Mancante" severity="secondary" class="text-xs shrink-0" />
-
         <!-- Azioni -->
-        <div class="flex gap-1 shrink-0">
+        <div class="flex gap-0.5 shrink-0">
           <Button
             v-tooltip.top="'Auto-traduci'"
             icon="pi pi-sparkles"
@@ -39,16 +39,16 @@
             text
             severity="secondary"
             :loading="translatingLocale === locale.code"
-            class="w-7 h-7"
+            class="!w-7 !h-7 !p-0"
             @click="autoTranslateSingle(locale)"
           />
           <Button
-            v-tooltip.top="'Modifica traduzione'"
+            v-tooltip.top="'Modifica'"
             icon="pi pi-pencil"
             size="small"
             text
             severity="secondary"
-            class="w-7 h-7"
+            class="!w-7 !h-7 !p-0"
             @click="openDrawer(locale)"
           />
         </div>
