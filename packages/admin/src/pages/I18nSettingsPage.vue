@@ -93,7 +93,8 @@
             class="w-full font-mono text-sm"
           />
           <small class="text-surface-400">
-            Variabili disponibili: <code>{sourceLocale}</code>, <code>{targetLocale}</code>, <code>{text}</code>.
+            Variabili disponibili: <code>{sourceLocale}</code>, <code>{sourceLocaleName}</code>,
+            <code>{targetLocale}</code>, <code>{targetLocaleName}</code>, <code>{text}</code>.
             Lascia vuoto per usare il template di default.
           </small>
         </div>
@@ -256,8 +257,8 @@ const saving         = ref(false)
 const testing        = ref(false)
 const testResult     = ref<'ok' | 'error' | null>(null)
 
-const defaultPromptPlaceholder = `Translate the following text from {sourceLocale} to {targetLocale}.
-Return ONLY the translated text, without any explanation.
+const defaultPromptPlaceholder = `Translate the following {sourceLocaleName} text to {targetLocaleName} ({targetLocale}).
+
 {text}`
 
 const form = ref({
