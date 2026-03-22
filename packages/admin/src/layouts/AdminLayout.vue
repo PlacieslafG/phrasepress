@@ -136,6 +136,18 @@
               </a>
             </RouterLink>
 
+            <RouterLink
+              v-if="appStore.isPluginActive('phrasepress-i18n')"
+              to="/i18n"
+              v-slot="{ navigate, isActive }"
+              custom
+            >
+              <a @click="navigate" :class="navClass(isActive)">
+                <i class="pi pi-language text-sm shrink-0" />
+                <span>Lingue</span>
+              </a>
+            </RouterLink>
+
             <RouterLink to="/api-tester" v-slot="{ navigate, isActive }" custom>
               <a @click="navigate" :class="navClass(isActive)">
                 <i class="pi pi-code text-sm shrink-0" />

@@ -76,6 +76,15 @@
             @restored="onRestored"
           />
         </Panel>
+
+        <!-- Traduzioni (plugin i18n, solo in edit) -->
+        <Panel v-if="!isNew && appStore.isPluginActive('phrasepress-i18n')" header="Traduzioni" toggleable>
+          <TranslationsPanel
+            :post-id="postId!"
+            :post-type="type"
+            :field-defs="fieldDefs"
+          />
+        </Panel>
       </aside>
     </div>
   </div>
@@ -93,6 +102,7 @@ import RichTextEditor   from '@/components/RichTextEditor.vue'
 import CustomFieldsPanel from '@/components/CustomFieldsPanel.vue'
 import TaxonomySelector from '@/components/TaxonomySelector.vue'
 import RevisionsPanel   from '@/components/RevisionsPanel.vue'
+import TranslationsPanel from '@/components/TranslationsPanel.vue'
 
 const route   = useRoute()
 const router  = useRouter()

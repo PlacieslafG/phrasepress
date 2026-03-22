@@ -128,6 +128,12 @@ const router = createRouter({
           component: () => import('@/pages/ApiTesterPage.vue'),
           meta: { requireCapability: 'manage_plugins' },
         },
+        {
+          path: 'i18n',
+          name: 'i18n-settings',
+          component: () => import('@/pages/I18nSettingsPage.vue'),
+          meta: { requireCapability: 'manage_plugins' },
+        },
       ],
     },
     {

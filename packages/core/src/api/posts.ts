@@ -5,6 +5,7 @@ import type { Tx } from '../db/client.js'
 import { posts, postFieldIndex, postRevisions, postTerms, terms, taxonomies } from '../db/schema.js'
 import { generateSlug, ensureUniqueSlug } from '../post-types/slug.js'
 import type { PostTypeRegistry } from '../post-types/registry.js'
+import type { HookManager } from '../hooks/HookManager.js'
 import '../types.js'
 
 // ─── Tipi inferiti da Drizzle ────────────────────────────────────────────────
@@ -85,13 +86,14 @@ function createRevision(tx: Tx, post: Post, authorId?: number) {
 
 interface PostsPluginOptions {
   postTypeRegistry: PostTypeRegistry
+  hooksManager?: HookManager
 }
 
 // Regex per riconoscere il formato ?fieldName[op]=value
 const FIELD_FILTER_RE = /^([\w]+)\[(gt|gte|lt|lte|eq)\]$/
 
 const postsRoutes: FastifyPluginAsync<PostsPluginOptions> = async (fastify, opts) => {
-  const { postTypeRegistry } = opts
+  const { postTypeRegistry, hooksManager } = opts
 
   // ── GET /posts ─────────────────────────────────────────────────────────────
   fastify.get<{
@@ -430,6 +432,7 @@ const postsRoutes: FastifyPluginAsync<PostsPluginOptions> = async (fastify, opts
       }
     })
 
+    await hooksManager?.doAction('post.updated', postId)
     return fetchPostWithTerms(postId)
   })
 
@@ -464,6 +467,7 @@ const postsRoutes: FastifyPluginAsync<PostsPluginOptions> = async (fastify, opts
     if (force) {
       // Hard delete — cascata su post_field_index, post_revisions, post_terms
       db.delete(posts).where(eq(posts.id, postId)).run()
+      await hooksManager?.doAction('post.deleted', postId)
     } else {
       // Soft delete
       db.update(posts).set({ status: 'trash', updatedAt: Math.floor(Date.now() / 1000) })

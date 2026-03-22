@@ -1,0 +1,19 @@
+{
+  "name": "@phrasepress/plugin-i18n",
+  "version": "1.0.0",
+  "description": "Multilingual support with LLM-powered auto-translation for PhrasePress",
+  "type": "module",
+  "main": "./src/index.ts",
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@phrasepress/core": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "drizzle-orm": "^0.40.1",
+    "fastify": "^5.2.1",
+    "typescript": "^5.7.3"
+  }
+}

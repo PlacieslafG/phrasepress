@@ -96,7 +96,7 @@ export async function createServer(config: PhrasePressConfig) {
     await app.register(authRoutes,       { prefix: '/auth' })
     await app.register(usersRoutes,      { prefix: '/users' })
     await app.register(rolesRoutes,      { prefix: '/roles' })
-    await app.register(postsRoutes,      { prefix: '/posts', postTypeRegistry })
+    await app.register(postsRoutes,      { prefix: '/posts', postTypeRegistry, hooksManager: hooks })
     await app.register(taxonomiesRoutes, { prefix: '/taxonomies', taxonomyRegistry })
     await app.register(postTermsRoutes,  { prefix: '/posts',      taxonomyRegistry })
     await app.register(pluginsRoutes,    { prefix: '/plugins',    loader })
