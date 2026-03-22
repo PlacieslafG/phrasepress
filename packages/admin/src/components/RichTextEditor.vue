@@ -1,47 +1,58 @@
 <template>
   <div class="border border-surface-200 rounded-lg overflow-hidden">
     <!-- Toolbar -->
-    <div class="flex flex-wrap gap-1 p-2 border-b border-surface-200 bg-surface-50">
-      <Button text rounded size="small" icon="pi pi-bold"
-        :severity="editor?.isActive('bold') ? 'primary' : 'secondary'"
-        @click="editor?.chain().focus().toggleBold().run()" />
-      <Button text rounded size="small" icon="pi pi-italic"
-        :severity="editor?.isActive('italic') ? 'primary' : 'secondary'"
-        @click="editor?.chain().focus().toggleItalic().run()" />
-      <Button text rounded size="small" icon="pi pi-link"
-        :severity="editor?.isActive('link') ? 'primary' : 'secondary'"
-        @click="setLink" />
-      <Divider layout="vertical" class="mx-1 h-6" />
-      <Button text rounded size="small" label="H1"
-        :severity="editor?.isActive('heading', { level: 1 }) ? 'primary' : 'secondary'"
-        @click="editor?.chain().focus().toggleHeading({ level: 1 }).run()" />
-      <Button text rounded size="small" label="H2"
-        :severity="editor?.isActive('heading', { level: 2 }) ? 'primary' : 'secondary'"
-        @click="editor?.chain().focus().toggleHeading({ level: 2 }).run()" />
-      <Button text rounded size="small" label="H3"
-        :severity="editor?.isActive('heading', { level: 3 }) ? 'primary' : 'secondary'"
-        @click="editor?.chain().focus().toggleHeading({ level: 3 }).run()" />
-      <Divider layout="vertical" class="mx-1 h-6" />
-      <Button text rounded size="small" icon="pi pi-list"
-        :severity="editor?.isActive('bulletList') ? 'primary' : 'secondary'"
-        @click="editor?.chain().focus().toggleBulletList().run()" />
-      <Button text rounded size="small" icon="pi pi-list-check"
-        :severity="editor?.isActive('orderedList') ? 'primary' : 'secondary'"
-        @click="editor?.chain().focus().toggleOrderedList().run()" />
-      <Button text rounded size="small" icon="pi pi-comment"
-        :severity="editor?.isActive('blockquote') ? 'primary' : 'secondary'"
-        @click="editor?.chain().focus().toggleBlockquote().run()" />
-      <Divider layout="vertical" class="mx-1 h-6" />
-      <Button text rounded size="small" icon="pi pi-undo" severity="secondary"
-        :disabled="!editor?.can().undo()"
-        @click="editor?.chain().focus().undo().run()" />
-      <Button text rounded size="small" icon="pi pi-redo" severity="secondary"
-        :disabled="!editor?.can().redo()"
-        @click="editor?.chain().focus().redo().run()" />
-      <Divider layout="vertical" class="mx-1 h-6" />
-      <Button text rounded size="small" icon="pi pi-image" severity="secondary"
-        v-tooltip="'Inserisci immagine'"
-        @click="mediaPickerVisible = true" />
+    <div class="flex flex-wrap items-center gap-0.5 p-1.5 border-b border-surface-200">
+      <!-- Bold -->
+      <button :class="tbBtn(editor?.isActive('bold'))" style="font-weight:700;font-family:serif"
+        @click="editor?.chain().focus().toggleBold().run()">B</button>
+      <!-- Italic -->
+      <button :class="tbBtn(editor?.isActive('italic'))" style="font-style:italic;font-family:serif"
+        @click="editor?.chain().focus().toggleItalic().run()">I</button>
+      <!-- Link -->
+      <button :class="tbBtn(editor?.isActive('link'))" @click="setLink">
+        <i class="pi pi-link" />
+      </button>
+
+      <span class="w-px h-5 bg-surface-300 mx-0.5 shrink-0" />
+
+      <button :class="tbBtn(editor?.isActive('heading', { level: 1 }))"
+        @click="editor?.chain().focus().toggleHeading({ level: 1 }).run()">H1</button>
+      <button :class="tbBtn(editor?.isActive('heading', { level: 2 }))"
+        @click="editor?.chain().focus().toggleHeading({ level: 2 }).run()">H2</button>
+      <button :class="tbBtn(editor?.isActive('heading', { level: 3 }))"
+        @click="editor?.chain().focus().toggleHeading({ level: 3 }).run()">H3</button>
+
+      <span class="w-px h-5 bg-surface-300 mx-0.5 shrink-0" />
+
+      <button :class="tbBtn(editor?.isActive('bulletList'))"
+        @click="editor?.chain().focus().toggleBulletList().run()">
+        <i class="pi pi-list" />
+      </button>
+      <button :class="tbBtn(editor?.isActive('orderedList'))"
+        @click="editor?.chain().focus().toggleOrderedList().run()">
+        <i class="pi pi-list-check" />
+      </button>
+      <button :class="tbBtn(editor?.isActive('blockquote'))"
+        @click="editor?.chain().focus().toggleBlockquote().run()">
+        <i class="pi pi-code" />
+      </button>
+
+      <span class="w-px h-5 bg-surface-300 mx-0.5 shrink-0" />
+
+      <button :class="tbBtn(false)" :disabled="!editor?.can().undo()"
+        @click="editor?.chain().focus().undo().run()">
+        <i class="pi pi-undo" />
+      </button>
+      <button :class="tbBtn(false)" :disabled="!editor?.can().redo()"
+        @click="editor?.chain().focus().redo().run()">
+        <i class="pi pi-forward" />
+      </button>
+
+      <span class="w-px h-5 bg-surface-300 mx-0.5 shrink-0" />
+
+      <button :class="tbBtn(false)" @click="mediaPickerVisible = true">
+        <i class="pi pi-image" />
+      </button>
     </div>
 
     <!-- Editor area -->
@@ -63,6 +74,16 @@ const props = defineProps<{ modelValue: string }>()
 const emit  = defineEmits<{ 'update:modelValue': [value: string] }>()
 
 const mediaPickerVisible = ref(false)
+
+function tbBtn(active: boolean | undefined) {
+  return [
+    'inline-flex items-center justify-center w-7 h-7 rounded text-sm transition-colors',
+    'disabled:opacity-30 disabled:cursor-not-allowed',
+    active
+      ? 'bg-primary-100 text-primary-700 dark:bg-primary-900/40 dark:text-primary-300'
+      : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700',
+  ].join(' ')
+}
 
 function insertImage(url: string, alt: string) {
   editor.value?.chain().focus().setImage({ src: url, alt }).run()

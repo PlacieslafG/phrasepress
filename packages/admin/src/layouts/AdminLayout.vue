@@ -5,17 +5,24 @@
       class="flex items-center justify-between px-4 h-14 bg-surface-card border-b border-surface-border shrink-0"
     >
       <div class="flex items-center gap-3">
-        <Button text plain @click="sidebarOpen = !sidebarOpen" icon="pi pi-bars" />
+        <button class="hbtn" @click="sidebarOpen = !sidebarOpen">
+          <i class="pi pi-bars" />
+        </button>
         <span class="font-semibold text-lg">PhrasePress</span>
       </div>
       <div class="flex items-center gap-3">
         <span class="text-sm text-surface-500">{{ authStore.user?.username }}</span>
-        <Button
-          text plain
-          :icon="themeStore.isDark ? 'pi pi-sun' : 'pi pi-moon'"
+        <button
+          class="hbtn"
+          v-tooltip.bottom="themeStore.isDark ? 'Tema chiaro' : 'Tema scuro'"
           @click="themeStore.toggleDark()"
-        />
-        <Button text plain icon="pi pi-sign-out" label="Logout" size="small" @click="handleLogout" />
+        >
+          <i :class="themeStore.isDark ? 'pi pi-sun' : 'pi pi-moon'" />
+        </button>
+        <button class="hbtn gap-1.5 px-2" @click="handleLogout">
+          <i class="pi pi-sign-out" />
+          <span class="text-sm">Logout</span>
+        </button>
       </div>
     </header>
 
