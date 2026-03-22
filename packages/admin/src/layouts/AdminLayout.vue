@@ -216,3 +216,8 @@ async function handleLogout() {
   window.location.replace('/login')
 }
 </script>
+
+<style>
+.hbtn { color: #334155; }
+.dark .hbtn { color: #e2e8f0; }
+</style>
