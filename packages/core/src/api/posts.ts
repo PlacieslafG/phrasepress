@@ -1,5 +1,5 @@
 import type { FastifyPluginAsync } from 'fastify'
-import { and, eq, ne, lt, gt, lte, gte, like, sql, exists, inArray } from 'drizzle-orm'
+import { and, or, eq, ne, lt, gt, lte, gte, like, sql, exists, inArray } from 'drizzle-orm'
 import { db } from '../db/client.js'
 import type { Tx } from '../db/client.js'
 import { posts, postFieldIndex, postRevisions, postTerms, terms, taxonomies } from '../db/schema.js'
@@ -106,9 +106,12 @@ const postsRoutes: FastifyPluginAsync<PostsPluginOptions> = async (fastify, opts
           status:  { type: 'string', enum: ['draft', 'published', 'trash', 'any'] },
           page:    { type: 'string' },
           limit:   { type: 'string' },
-          orderBy: { type: 'string' },
-          order:   { type: 'string', enum: ['asc', 'desc'] },
-          search:  { type: 'string' },
+          orderBy:  { type: 'string' },
+          order:    { type: 'string', enum: ['asc', 'desc'] },
+          search:   { type: 'string' },
+          authorId: { type: 'string' },
+          dateFrom: { type: 'string' },
+          dateTo:   { type: 'string' },
         },
         additionalProperties: true,  // permette filtri dinamici per terms e fields
       },
@@ -132,7 +135,18 @@ const postsRoutes: FastifyPluginAsync<PostsPluginOptions> = async (fastify, opts
       conditions.push(eq(posts.status, status))
     }
     if (q['search']) {
-      conditions.push(like(posts.title, `%${q['search']}%`))
+      const term = `%${q['search']}%`
+      conditions.push(or(like(posts.title, term), like(posts.content, term))!)
+    }
+
+    if (q['authorId']) {
+      conditions.push(eq(posts.authorId, parseInt(q['authorId'], 10)))
+    }
+    if (q['dateFrom']) {
+      conditions.push(gte(posts.createdAt, parseInt(q['dateFrom'], 10)))
+    }
+    if (q['dateTo']) {
+      conditions.push(lte(posts.createdAt, parseInt(q['dateTo'], 10)))
     }
 
     const ptDef = postTypeRegistry.get(postType)
@@ -143,7 +157,7 @@ const postsRoutes: FastifyPluginAsync<PostsPluginOptions> = async (fastify, opts
     const fieldFilters: Array<{ name: string; op: string; value: string }> = []
 
     for (const [key, value] of Object.entries(q)) {
-      if (['type', 'status', 'page', 'limit', 'orderBy', 'order', 'search'].includes(key)) continue
+      if (['type', 'status', 'page', 'limit', 'orderBy', 'order', 'search', 'authorId', 'dateFrom', 'dateTo'].includes(key)) continue
       const fieldMatch = FIELD_FILTER_RE.exec(key)
       if (fieldMatch) {
         fieldFilters.push({ name: fieldMatch[1]!, op: fieldMatch[2]!, value })

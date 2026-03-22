@@ -53,11 +53,16 @@ export interface PostRevision {
 }
 
 export interface PostListParams {
-  type:     string
-  status?:  string
-  search?:  string
-  page?:    number
-  limit?:   number
+  type:      string
+  status?:   string
+  search?:   string
+  page?:     number
+  limit?:    number
+  authorId?: number
+  dateFrom?: number
+  dateTo?:   number
+  orderBy?:  string
+  order?:    'asc' | 'desc'
   [key: string]: string | number | undefined
 }
 

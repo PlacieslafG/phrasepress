@@ -201,3 +201,100 @@ describe('DELETE /api/v1/posts/:id', () => {
     expect(res.statusCode).toBe(401)
   })
 })
+
+// ─── Filtri avanzati lista post ──────────────────────────────────────────────
+
+describe('GET /api/v1/posts — ricerca e filtri avanzati', () => {
+  it('cerca nel titolo', async () => {
+    await createPost({ postType: 'post', title: 'Articolo sul clima', status: 'published' })
+    await createPost({ postType: 'post', title: 'Note varie',        status: 'published' })
+
+    const res = await app.inject({ method: 'GET', url: '/api/v1/posts?type=post&search=clima' })
+    expect(res.statusCode).toBe(200)
+    const body = res.json<{ data: Array<{ title: string }> }>()
+    expect(body.data.length).toBe(1)
+    expect(body.data[0]?.title).toBe('Articolo sul clima')
+  })
+
+  it('cerca nel contenuto', async () => {
+    await createPost({ postType: 'post', title: 'Post A', content: 'Testo che parla di ecologia', status: 'published' })
+    await createPost({ postType: 'post', title: 'Post B', content: 'Contenuto generico',          status: 'published' })
+
+    const res = await app.inject({ method: 'GET', url: '/api/v1/posts?type=post&search=ecologia' })
+    expect(res.statusCode).toBe(200)
+    const body = res.json<{ data: Array<{ title: string }> }>()
+    expect(body.data.length).toBe(1)
+    expect(body.data[0]?.title).toBe('Post A')
+  })
+
+  it('filtra per authorId', async () => {
+    // Crea un post con l'admin — ottieni il suo userId dal post creato
+    const created = (await createPost({ postType: 'post', title: 'Admin Post', status: 'published' }))
+      .json<{ id: number; authorId: number }>()
+
+    const adminId = created.authorId
+
+    const res = await app.inject({ method: 'GET', url: `/api/v1/posts?type=post&authorId=${adminId}` })
+    expect(res.statusCode).toBe(200)
+    const body = res.json<{ data: Array<{ authorId: number }> }>()
+    expect(body.data.every(p => p.authorId === adminId)).toBe(true)
+  })
+
+  it('filtra per authorId inesistente restituisce lista vuota', async () => {
+    await createPost({ postType: 'post', title: 'Qualcosa', status: 'published' })
+
+    const res = await app.inject({ method: 'GET', url: '/api/v1/posts?type=post&authorId=99999' })
+    expect(res.statusCode).toBe(200)
+    expect(res.json<{ data: unknown[] }>().data.length).toBe(0)
+  })
+
+  it('filtra per dateFrom', async () => {
+    const testStart = Math.floor(Date.now() / 1000)
+    const past      = testStart - 10000
+
+    // Inocula un post con timestamp passato direttamente nel DB
+    db.insert(posts).values({
+      postType:  'post',
+      title:     'Post Vecchio',
+      slug:      'post-vecchio',
+      content:   '',
+      fields:    '{}',
+      status:    'published',
+      authorId:  null,
+      createdAt: past,
+      updatedAt: past,
+    }).run()
+    // Post Recente viene creato dopo testStart → createdAt >= testStart
+    await createPost({ postType: 'post', title: 'Post Recente', status: 'published' })
+
+    // Filtra dalla soglia testStart - 1 (include Post Recente, esclude Post Vecchio)
+    const dateFrom = testStart - 1
+    const res = await app.inject({ method: 'GET', url: `/api/v1/posts?type=post&status=any&dateFrom=${dateFrom}` })
+    expect(res.statusCode).toBe(200)
+    const body = res.json<{ data: Array<{ title: string; createdAt: number }> }>()
+    expect(body.data.every(p => p.createdAt >= dateFrom)).toBe(true)
+    expect(body.data.some(p => p.title === 'Post Recente')).toBe(true)
+    expect(body.data.some(p => p.title === 'Post Vecchio')).toBe(false)
+  })
+
+  it('ordina per titolo asc', async () => {
+    await createPost({ postType: 'post', title: 'Zebra', status: 'published' })
+    await createPost({ postType: 'post', title: 'Alfa',  status: 'published' })
+    await createPost({ postType: 'post', title: 'Mela',  status: 'published' })
+
+    const res = await app.inject({ method: 'GET', url: '/api/v1/posts?type=post&orderBy=title&order=asc' })
+    expect(res.statusCode).toBe(200)
+    const titles = res.json<{ data: Array<{ title: string }> }>().data.map(p => p.title)
+    expect(titles).toEqual([...titles].sort())
+  })
+
+  it('ordina per titolo desc', async () => {
+    await createPost({ postType: 'post', title: 'Zebra', status: 'published' })
+    await createPost({ postType: 'post', title: 'Alfa',  status: 'published' })
+
+    const res = await app.inject({ method: 'GET', url: '/api/v1/posts?type=post&orderBy=title&order=desc' })
+    expect(res.statusCode).toBe(200)
+    const titles = res.json<{ data: Array<{ title: string }> }>().data.map(p => p.title)
+    expect(titles).toEqual([...titles].sort().reverse())
+  })
+})
