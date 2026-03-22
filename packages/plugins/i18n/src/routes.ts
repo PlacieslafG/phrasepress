@@ -1,6 +1,5 @@
 import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify'
 import type { PluginContext } from '@phrasepress/core'
-import { generateSlug } from '@phrasepress/core'
 import {
   dbListLocales, dbGetLocale, dbCreateLocale, dbUpdateLocale, dbDeleteLocale,
   dbListTranslations, dbGetTranslation, dbUpsertTranslation, dbDeleteTranslation,
@@ -9,6 +8,18 @@ import {
   ensureUniqueTranslationSlug,
 } from './db.js'
 import { translateText, translateFields, testConnection, TranslatorError, type TranslatorConfig } from './translator.js'
+
+// Inlined to avoid a runtime import of @phrasepress/core (no dist/ in dev)
+function generateSlug(title: string): string {
+  return title
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[\s_]+/g, '-')
+    .replace(/[^a-z0-9-]/g, '')
+    .replace(/-+/g, '-')
+    .replace(/^-+|-+$/g, '')
+}
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
