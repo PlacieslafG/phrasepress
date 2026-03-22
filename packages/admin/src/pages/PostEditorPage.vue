@@ -11,7 +11,7 @@
           <span class="text-surface-600">{{ isNew ? 'Nuovo' : form.title || '…' }}</span>
         </span>
         <span v-if="activeLocale !== null" class="flex items-center gap-1 text-xs font-semibold text-primary-500 mt-0.5">
-          <i class="pi pi-language text-[10px]" />{{ currentLocaleLabel }}
+          <i class="pi pi-language text-[10px]" />{{ currentLocaleLabel }} — traduzione
         </span>
       </div>
 
@@ -62,22 +62,16 @@
       class="flex items-center px-2 border-b border-surface-200 bg-surface-50 shrink-0 overflow-x-auto"
       style="scrollbar-width:none"
     >
-      <!-- Originale -->
-      <button :class="tabClass(null)" @click="activeLocale = null">
-        <i class="pi pi-file-edit text-[11px]" />
-        Originale
-      </button>
-
-      <!-- One tab per locale -->
+      <!-- One tab per locale; default locale = original editor, others = translation editor -->
       <button
         v-for="locale in locales"
         :key="locale.code"
-        :class="tabClass(locale.code)"
-        @click="switchLocale(locale.code)"
+        :class="localeTabClass(locale)"
+        @click="locale.isDefault ? (activeLocale = null) : switchLocale(locale.code)"
       >
         {{ locale.label }}
-        <!-- Status indicator -->
-        <span class="inline-flex items-center">
+        <!-- Status indicator (only on non-default locales) -->
+        <span v-if="!locale.isDefault" class="inline-flex items-center">
           <i v-if="translatingLocale === locale.code" class="pi pi-spinner pi-spin text-[10px]" />
           <i
             v-else-if="getTranslation(locale.code) && !getTranslation(locale.code)!.isDirty"
@@ -166,7 +160,7 @@
               Stai modificando la traduzione in
               <strong>{{ currentLocaleLabel }}</strong>.
               Le tassonomie e le revisioni sono gestite nella scheda
-              <button class="underline font-semibold" @click="activeLocale = null">Originale</button>.
+              <button class="underline font-semibold" @click="activeLocale = null">{{ defaultLocale?.label ?? 'lingua base' }}</button>.
             </span>
           </div>
 
@@ -350,6 +344,8 @@ const showI18nTabs = computed(() =>
   !isNew.value && appStore.isPluginActive('phrasepress-i18n') && locales.value.length > 0
 )
 
+const defaultLocale = computed(() => locales.value.find(l => l.isDefault) ?? null)
+
 const currentLocale = computed(() =>
   locales.value.find(l => l.code === activeLocale.value) ?? null
 )
@@ -360,8 +356,9 @@ function getTranslation(code: string): Translation | undefined {
   return translations.value.find(t => t.locale === code)
 }
 
-function tabClass(code: string | null): string {
-  const active = activeLocale.value === code
+// Default locale tab is "active" when activeLocale is null (showing original editor)
+function localeTabClass(locale: Locale): string {
+  const active = locale.isDefault ? activeLocale.value === null : activeLocale.value === locale.code
   return [
     'flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors shrink-0 whitespace-nowrap',
     active
