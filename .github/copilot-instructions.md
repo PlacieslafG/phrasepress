@@ -7,18 +7,18 @@ PhrasePress è un CMS headless minimale ispirato a WordPress, scritto interament
 Per qualsiasi richiesta che comporti modifiche al codice, seguire **sempre** questi passi nell'ordine indicato. Non saltare passi, non procedere al passo successivo se quello corrente ha fallito.
 
 ### 1. Carica le instruction files rilevanti
-Identificare quale/i area/e del codice è coinvolta e **leggere** i file instruction corrispondenti prima di qualsiasi altra azione:
+Identificare quale/i area/e del codice è coinvolta e usare **`read_file`** per leggere i file instruction corrispondenti dai percorsi indicati. Questo è il **primo tool call obbligatorio** — non scrivere codice prima di averli letti.
 
-| Area | Instruction file |
+| Area | Percorso assoluto da leggere con read_file |
 |---|---|
-| Core Node.js, ESM, bootstrap, post types, slug | `.github/instructions/core.instructions.md` |
-| Database, Drizzle ORM, schema, migration, seed | `.github/instructions/database.instructions.md` |
-| Route Fastify, JSON Schema, REST API | `.github/instructions/api.instructions.md` |
-| Auth, JWT, argon2, capabilities, cookie | `.github/instructions/auth.instructions.md` |
-| Admin Vue 3, Pinia, PrimeVue, Tiptap, router | `.github/instructions/admin.instructions.md` |
-| Plugin, hook, HookManager, PluginContext | `.github/instructions/plugins.instructions.md` |
-| Test Vitest, createTestApp, app.inject | `.github/instructions/testing.instructions.md` |
-| phrasepress.config.ts, defineConfig, FieldType | `.github/instructions/config.instructions.md` |
+| Core Node.js, ESM, bootstrap, post types, slug | `/home/giuseppe/sandbox/phrasepress/.github/instructions/core.instructions.md` |
+| Database, Drizzle ORM, schema, migration, seed | `/home/giuseppe/sandbox/phrasepress/.github/instructions/database.instructions.md` |
+| Route Fastify, JSON Schema, REST API | `/home/giuseppe/sandbox/phrasepress/.github/instructions/api.instructions.md` |
+| Auth, JWT, argon2, capabilities, cookie | `/home/giuseppe/sandbox/phrasepress/.github/instructions/auth.instructions.md` |
+| Admin Vue 3, Pinia, PrimeVue, Tiptap, router | `/home/giuseppe/sandbox/phrasepress/.github/instructions/admin.instructions.md` |
+| Plugin, hook, HookManager, PluginContext | `/home/giuseppe/sandbox/phrasepress/.github/instructions/plugins.instructions.md` |
+| Test Vitest, createTestApp, app.inject | `/home/giuseppe/sandbox/phrasepress/.github/instructions/testing.instructions.md` |
+| phrasepress.config.ts, defineConfig, FieldType | `/home/giuseppe/sandbox/phrasepress/.github/instructions/config.instructions.md` |
 
 ### 2. Leggi tutto il codice coinvolto
 Prima di scrivere qualsiasi riga: leggere i file sorgente rilevanti, la struttura directory, i tipi Drizzle inferiti. Non fare assunzioni su implementazioni non lette.

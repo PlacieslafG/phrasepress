@@ -19,7 +19,7 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
 
   // ── POST /auth/login ───────────────────────────────────────────────────────
   fastify.post<{ Body: { username: string; password: string } }>('/login', {
-    config: { rateLimit: { max: 10, timeWindow: '1 minute' } },
+    config: { rateLimit: { max: process.env['NODE_ENV'] === 'development' ? 100 : 10, timeWindow: '1 minute' } },
     schema: {
       body: {
         type: 'object',

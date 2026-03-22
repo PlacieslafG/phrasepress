@@ -112,6 +112,30 @@
               </a>
             </RouterLink>
 
+            <RouterLink
+              v-if="appStore.isPluginActive('phrasepress-forms')"
+              to="/forms"
+              v-slot="{ navigate, isActive }"
+              custom
+            >
+              <a @click="navigate" :class="navClass(isActive)">
+                <i class="pi pi-envelope text-sm shrink-0" />
+                <span>Form</span>
+              </a>
+            </RouterLink>
+
+            <RouterLink
+              v-if="appStore.isPluginActive('phrasepress-mailer')"
+              to="/mailer-settings"
+              v-slot="{ navigate, isActive }"
+              custom
+            >
+              <a @click="navigate" :class="navClass(isActive)">
+                <i class="pi pi-send text-sm shrink-0" />
+                <span>Mailer</span>
+              </a>
+            </RouterLink>
+
             <RouterLink to="/api-tester" v-slot="{ navigate, isActive }" custom>
               <a @click="navigate" :class="navClass(isActive)">
                 <i class="pi pi-code text-sm shrink-0" />

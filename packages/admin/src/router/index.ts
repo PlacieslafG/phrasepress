@@ -93,6 +93,36 @@ const router = createRouter({
           meta: { requireCapability: 'manage_plugins' },
         },
         {
+          path: 'forms',
+          name: 'forms',
+          component: () => import('@/pages/FormsPage.vue'),
+          meta: { requireCapability: 'manage_plugins' },
+        },
+        {
+          path: 'forms/new',
+          name: 'form-new',
+          component: () => import('@/pages/FormEditorPage.vue'),
+          meta: { requireCapability: 'manage_plugins' },
+        },
+        {
+          path: 'forms/:id/edit',
+          name: 'form-edit',
+          component: () => import('@/pages/FormEditorPage.vue'),
+          meta: { requireCapability: 'manage_plugins' },
+        },
+        {
+          path: 'forms/:id/submissions',
+          name: 'form-submissions',
+          component: () => import('@/pages/FormSubmissionsPage.vue'),
+          meta: { requireCapability: 'manage_plugins' },
+        },
+        {
+          path: 'mailer-settings',
+          name: 'mailer-settings',
+          component: () => import('@/pages/MailerSettingsPage.vue'),
+          meta: { requireCapability: 'manage_options' },
+        },
+        {
           path: 'api-tester',
           name: 'api-tester',
           component: () => import('@/pages/ApiTesterPage.vue'),

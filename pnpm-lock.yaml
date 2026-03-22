@@ -147,6 +147,50 @@ importers:
         specifier: ^5.7.3
         version: 5.9.3
 
+  packages/plugins/forms:
+    dependencies:
+      '@phrasepress/core':
+        specifier: workspace:*
+        version: link:../../core
+    devDependencies:
+      '@types/node':
+        specifier: ^22.0.0
+        version: 22.19.15
+      drizzle-orm:
+        specifier: ^0.40.1
+        version: 0.40.1(@types/better-sqlite3@7.6.13)(better-sqlite3@11.10.0)(gel@2.2.0)
+      fastify:
+        specifier: ^5.2.1
+        version: 5.8.2
+      typescript:
+        specifier: ^5.7.3
+        version: 5.9.3
+
+  packages/plugins/mailer:
+    dependencies:
+      '@phrasepress/core':
+        specifier: workspace:*
+        version: link:../../core
+      nodemailer:
+        specifier: ^6.10.0
+        version: 6.10.1
+    devDependencies:
+      '@types/node':
+        specifier: ^22.0.0
+        version: 22.19.15
+      '@types/nodemailer':
+        specifier: ^6.4.17
+        version: 6.4.23
+      drizzle-orm:
+        specifier: ^0.40.1
+        version: 0.40.1(@types/better-sqlite3@7.6.13)(better-sqlite3@11.10.0)(gel@2.2.0)
+      fastify:
+        specifier: ^5.2.1
+        version: 5.8.2
+      typescript:
+        specifier: ^5.7.3
+        version: 5.9.3
+
   packages/plugins/media:
     dependencies:
       '@phrasepress/core':
@@ -1307,6 +1351,9 @@ packages:
   '@types/node@22.19.15':
     resolution: {integrity: sha512-F0R/h2+dsy5wJAUe3tAU6oqa2qbWY5TpNfL/RGmo1y38hiyO1w3x2jPtt76wmuaJI4DQnOBu21cNXQ2STIUUWg==}
 
+  '@types/nodemailer@6.4.23':
+    resolution: {integrity: sha512-aFV3/NsYFLSx9mbb5gtirBSXJnAlrusoKNuPbxsASWc7vrKLmIrTQRpdcxNcSFL3VW2A2XpeLEavwb2qMi6nlQ==}
+
   '@vitejs/plugin-vue@5.2.4':
     resolution: {integrity: sha512-7Yx/SXSOcQq5HiiV3orevHUFn+pmMB4cgbEkDYgnkUWb0WfeQ/wa2yFv6D5ICiCQOVpjA7vYDXrC7AGO8yjDHA==}
     engines: {node: ^18.0.0 || >=20.0.0}
@@ -1997,6 +2044,10 @@ packages:
   node-gyp-build@4.8.4:
     resolution: {integrity: sha512-LA4ZjwlnUblHVgq0oBF3Jl/6h/Nvs5fzBLwdEF4nuxnFdsfajde4WfxtJr3CaiH+F6ewcIB/q4jQ4UzPyid+CQ==}
     hasBin: true
+
+  nodemailer@6.10.1:
+    resolution: {integrity: sha512-Z+iLaBGVaSjbIzQ4pX6XV41HrooLsQ10ZWPUehGmuantvzWoDVBnmsdUcOIDM1t+yPor5pDhVlDESgOMEGxhHA==}
+    engines: {node: '>=6.0.0'}
 
   obliterator@2.0.5:
     resolution: {integrity: sha512-42CPE9AhahZRsMNslczq0ctAEtqk8Eka26QofnqC346BZdHDySk3LWka23LI7ULIw11NmltpiLagIq8gBozxTw==}
@@ -3278,6 +3329,10 @@ snapshots:
     dependencies:
       undici-types: 6.21.0
 
+  '@types/nodemailer@6.4.23':
+    dependencies:
+      '@types/node': 22.19.15
+
   '@vitejs/plugin-vue@5.2.4(vite@6.4.1(@types/node@22.19.15)(jiti@2.6.1)(lightningcss@1.32.0)(tsx@4.21.0))(vue@3.5.30(typescript@5.9.3))':
     dependencies:
       vite: 6.4.1(@types/node@22.19.15)(jiti@2.6.1)(lightningcss@1.32.0)(tsx@4.21.0)
@@ -3972,6 +4027,8 @@ snapshots:
   node-addon-api@8.6.0: {}
 
   node-gyp-build@4.8.4: {}
+
+  nodemailer@6.10.1: {}
 
   obliterator@2.0.5: {}
 

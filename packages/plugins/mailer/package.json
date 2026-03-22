@@ -1,0 +1,21 @@
+{
+  "name": "@phrasepress/plugin-mailer",
+  "version": "1.0.0",
+  "description": "Email notifications plugin for PhrasePress",
+  "type": "module",
+  "main": "./src/index.ts",
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@phrasepress/core": "workspace:*",
+    "nodemailer": "^6.10.0"
+  },
+  "devDependencies": {
+    "@types/nodemailer": "^6.4.17",
+    "@types/node": "^22.0.0",
+    "drizzle-orm": "^0.40.1",
+    "fastify": "^5.2.1",
+    "typescript": "^5.7.3"
+  }
+}
