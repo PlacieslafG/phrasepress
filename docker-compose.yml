@@ -1,0 +1,17 @@
+services:
+  phrasepress:
+    build: .
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./data:/data            # SQLite persistente
+      - ./uploads:/app/uploads  # File media persistenti
+      - ./config:/app/config    # Config utente
+    environment:
+      DATABASE_PATH: /data/phrasepress.db
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD}
+      PORT: 3000
+      NODE_ENV: production
+    restart: unless-stopped

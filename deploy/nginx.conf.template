@@ -1,0 +1,31 @@
+server {
+    listen 80;
+    server_name ${DOMAIN};
+
+    # Admin SPA — file statici (Vue build)
+    location / {
+        root   /var/www/phrasepress/dist/admin;
+        try_files $uri $uri/ /index.html;
+        expires 1h;
+        add_header Cache-Control "public";
+    }
+
+    # API → reverse proxy a Node.js / Fastify
+    location /api {
+        proxy_pass         http://127.0.0.1:3000;
+        proxy_http_version 1.1;
+        proxy_set_header   Upgrade    $http_upgrade;
+        proxy_set_header   Connection 'upgrade';
+        proxy_set_header   Host       $host;
+        proxy_set_header   X-Real-IP  $remote_addr;
+        proxy_set_header   X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_cache_bypass $http_upgrade;
+    }
+
+    # Upload file statici (plugin media)
+    location /uploads {
+        alias   /var/www/phrasepress/uploads;
+        expires 30d;
+        add_header Cache-Control "public, immutable";
+    }
+}

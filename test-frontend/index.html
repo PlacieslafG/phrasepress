@@ -1,0 +1,834 @@
+<!DOCTYPE html>
+<html lang="it" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>PhrasePress — Dev Tester</title>
+  <style>
+    :root {
+      --bg:       #111113;
+      --bg2:      #18181b;
+      --bg3:      #27272a;
+      --border:   #3f3f46;
+      --text:     #e4e4e7;
+      --muted:    #71717a;
+      --accent:   #a1a1aa;
+      --accent2:  #d4d4d8;
+      --green:    #22c55e;
+      --red:      #ef4444;
+      --yellow:   #f59e0b;
+      --radius:   6px;
+      --font:     'Inter', system-ui, sans-serif;
+      --mono:     'JetBrains Mono', 'Fira Code', monospace;
+    }
+    [data-theme="light"] {
+      --bg:     #f4f4f5; --bg2: #ffffff; --bg3: #f1f5f9;
+      --border: #e4e4e7; --text: #18181b; --muted: #71717a;
+      --accent: #52525b; --accent2: #3f3f46;
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: var(--font); background: var(--bg); color: var(--text); min-height: 100vh; font-size: 14px; }
+
+    /* ── Layout ── */
+    .app { display: grid; grid-template-rows: auto 1fr; height: 100vh; }
+    .header { background: var(--bg2); border-bottom: 1px solid var(--border); padding: .6rem 1rem; display: flex; align-items: center; gap: .75rem; flex-wrap: wrap; }
+    .header h1 { font-size: .9rem; font-weight: 700; letter-spacing: -.01em; color: var(--text); white-space: nowrap; }
+    .header-url { display: flex; gap: .5rem; flex: 1; min-width: 240px; }
+    .header-url input { flex: 1; background: var(--bg3); border: 1px solid var(--border); border-radius: var(--radius); color: var(--text); padding: .35rem .65rem; font-size: .82rem; outline: none; }
+    .header-url input:focus { border-color: var(--accent2); }
+    .body { display: grid; grid-template-columns: 190px 1fr; overflow: hidden; }
+
+    /* ── Sidebar tabs ── */
+    .sidebar { background: var(--bg2); border-right: 1px solid var(--border); padding: .5rem .4rem; display: flex; flex-direction: column; gap: .15rem; overflow-y: auto; }
+    .tab-btn { background: none; border: none; color: var(--muted); font: inherit; font-size: .82rem; padding: .4rem .65rem; border-radius: 5px; cursor: pointer; text-align: left; display: flex; align-items: center; gap: .45rem; transition: background .12s, color .12s; }
+    .tab-btn:hover { background: var(--bg3); color: var(--text); }
+    .tab-btn.active { background: var(--bg3); color: var(--text); font-weight: 600; }
+    .tab-section { font-size: .68rem; font-weight: 700; text-transform: uppercase; letter-spacing: .09em; color: var(--muted); padding: .65rem .65rem .2rem; }
+
+    /* ── Main panel ── */
+    .panel { overflow-y: auto; padding: 1.25rem; display: flex; flex-direction: column; gap: 1rem; }
+    .panel-header { display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
+    .panel-title { font-size: 1rem; font-weight: 700; }
+
+    /* ── Filters ── */
+    .filters { display: flex; gap: .5rem; flex-wrap: wrap; align-items: center; }
+    .filters select, .filters input[type=text], .filters input[type=number] {
+      background: var(--bg2); border: 1px solid var(--border); border-radius: var(--radius);
+      color: var(--text); padding: .32rem .6rem; font: inherit; font-size: .82rem; outline: none; min-width: 100px;
+    }
+    .filters select:focus, .filters input:focus { border-color: var(--accent2); }
+
+    /* ── Buttons ── */
+    .btn { display: inline-flex; align-items: center; gap: .4rem; border: none; border-radius: var(--radius); padding: .38rem .8rem; font: inherit; font-size: .82rem; font-weight: 600; cursor: pointer; transition: opacity .12s; }
+    .btn:hover { opacity: .8; }
+    .btn-primary { background: var(--bg3); color: var(--text); border: 1px solid var(--border); }
+    .btn-primary:hover { border-color: var(--accent2); opacity: 1; }
+    .btn-ghost { background: var(--bg3); color: var(--muted); border: 1px solid var(--border); }
+    .btn-ghost:hover { color: var(--text); opacity: 1; }
+    .btn-danger { background: rgba(239,68,68,.15); color: var(--red); border: 1px solid rgba(239,68,68,.3); }
+    .btn-sm { padding: .22rem .55rem; font-size: .77rem; }
+
+    /* ── Cards ── */
+    .card { background: var(--bg2); border: 1px solid var(--border); border-radius: var(--radius); }
+    .card-header { padding: .65rem .9rem; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; gap: .5rem; }
+    .card-header h3 { font-size: .85rem; font-weight: 600; }
+    .card-body { padding: .65rem .9rem; }
+
+    /* ── Post list ── */
+    .post-list { display: flex; flex-direction: column; gap: .4rem; }
+    .post-item { background: var(--bg2); border: 1px solid var(--border); border-radius: var(--radius); padding: .65rem .85rem; cursor: pointer; transition: border-color .12s, background .12s; display: flex; align-items: flex-start; gap: 1rem; }
+    .post-item:hover { border-color: var(--accent); background: var(--bg3); }
+    .post-item-main { flex: 1; min-width: 0; }
+    .post-item h3 { font-size: .88rem; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .post-item .slug { font-family: var(--mono); font-size: .73rem; color: var(--muted); margin-top: .12rem; }
+    .post-item-meta { font-size: .73rem; color: var(--muted); white-space: nowrap; text-align: right; }
+
+    /* ── Badges ── */
+    .badge { display: inline-block; font-size: .68rem; font-weight: 700; padding: .12rem .45rem; border-radius: 999px; }
+    .badge-published { background: rgba(34,197,94,.12); color: var(--green); }
+    .badge-draft     { background: rgba(245,158,11,.12); color: var(--yellow); }
+    .badge-trash     { background: rgba(239,68,68,.12);  color: var(--red); }
+    .badge-default   { background: var(--bg3); color: var(--muted); }
+
+    /* ── Post detail / drawer ── */
+    .detail-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.6); z-index: 10; display: none; }
+    .detail-drawer { position: fixed; top: 0; right: 0; bottom: 0; width: min(680px, 100vw); background: var(--bg2); border-left: 1px solid var(--border); z-index: 11; display: flex; flex-direction: column; transform: translateX(100%); transition: transform .22s ease; overflow: hidden; }
+    .detail-drawer.open { transform: translateX(0); }
+    .detail-overlay.open { display: block; }
+    .detail-head { padding: .9rem 1.1rem; border-bottom: 1px solid var(--border); display: flex; align-items: flex-start; gap: .75rem; }
+    .detail-head h2 { flex: 1; font-size: .95rem; font-weight: 700; }
+    .detail-body { flex: 1; overflow-y: auto; padding: 1.1rem; display: flex; flex-direction: column; gap: 1rem; }
+    .detail-section h4 { font-size: .7rem; font-weight: 700; text-transform: uppercase; letter-spacing: .09em; color: var(--muted); margin-bottom: .45rem; }
+
+    /* ── Fields ── */
+    .fields-grid { display: grid; grid-template-columns: auto 1fr; gap: .3rem .65rem; align-items: start; }
+    .field-key { font-family: var(--mono); font-size: .73rem; color: var(--muted); padding-top: .1rem; }
+    .field-val { font-size: .8rem; word-break: break-all; }
+
+    /* ── Terms chips ── */
+    .terms-list { display: flex; flex-wrap: wrap; gap: .3rem; }
+    .term-chip { background: var(--bg3); color: var(--accent2); font-size: .73rem; padding: .18rem .55rem; border-radius: 999px; border: 1px solid var(--border); cursor: pointer; }
+    .term-chip:hover { border-color: var(--accent2); color: var(--text); }
+
+    /* ── Pagination ── */
+    .pagination { display: flex; align-items: center; gap: .5rem; justify-content: center; }
+    .page-info { font-size: .8rem; color: var(--muted); }
+
+    /* ── Taxonomy browser ── */
+    .tax-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: .65rem; }
+    .tax-card { background: var(--bg2); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+    .tax-card-header { padding: .6rem .9rem; border-bottom: 1px solid var(--border); cursor: pointer; display: flex; align-items: center; gap: .5rem; }
+    .tax-card-header:hover { background: var(--bg3); }
+    .tax-card-header .tax-name { font-weight: 600; font-size: .88rem; flex: 1; }
+    .tax-card-header .tax-slug { font-family: var(--mono); font-size: .7rem; color: var(--muted); }
+    .tax-terms { padding: .5rem .75rem; display: flex; flex-wrap: wrap; gap: .35rem; }
+
+    /* ── Schema ── */
+    .schema-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: .65rem; }
+    .schema-field { display: flex; align-items: center; gap: .5rem; padding: .32rem 0; border-bottom: 1px solid var(--border); }
+    .schema-field:last-child { border: none; }
+    .field-type-badge { font-family: var(--mono); font-size: .67rem; background: var(--bg3); color: var(--accent2); border: 1px solid var(--border); padding: .08rem .4rem; border-radius: 4px; white-space: nowrap; }
+    .schema-field-name { flex: 1; font-size: .8rem; }
+    .schema-flag { font-size: .63rem; padding: .08rem .32rem; border-radius: 4px; background: rgba(34,197,94,.1); color: var(--green); font-weight: 700; }
+
+    /* ── API Explorer ── */
+    .explorer-form { display: flex; gap: .5rem; flex-wrap: wrap; }
+    .explorer-form select { width: 90px; }
+    .explorer-form input { flex: 1; min-width: 200px; }
+    .explorer-body-area { width: 100%; background: var(--bg3); border: 1px solid var(--border); border-radius: var(--radius); color: var(--text); padding: .55rem .8rem; font: .8rem/1.5 var(--mono); min-height: 80px; resize: vertical; outline: none; }
+    .explorer-body-area:focus { border-color: var(--accent2); }
+    .response-box { background: var(--bg3); border: 1px solid var(--border); border-radius: var(--radius); padding: .8rem .9rem; font: .77rem/1.6 var(--mono); white-space: pre-wrap; word-break: break-all; overflow-y: auto; max-height: 500px; }
+    .response-info { display: flex; gap: .75rem; align-items: center; font-size: .78rem; }
+    .status-ok { color: var(--green); font-weight: 700; }
+    .status-err { color: var(--red); font-weight: 700; }
+
+    /* ── Stats ── */
+    .stats-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: .65rem; }
+    .stat-card { background: var(--bg2); border: 1px solid var(--border); border-radius: var(--radius); padding: .9rem 1rem; text-align: center; cursor: pointer; transition: border-color .12s; }
+    .stat-card:hover { border-color: var(--accent); }
+    .stat-num { font-size: 1.9rem; font-weight: 700; color: var(--text); line-height: 1; }
+    .stat-lbl { font-size: .73rem; color: var(--muted); margin-top: .3rem; }
+
+    /* ── Misc ── */
+    .empty { text-align:center; color: var(--muted); padding: 2.5rem 1rem; font-size: .88rem; }
+    .loading { text-align:center; color: var(--muted); padding: 2.5rem 1rem; }
+    .error-msg { background: rgba(239,68,68,.08); border: 1px solid rgba(239,68,68,.25); color: var(--red); border-radius: var(--radius); padding: .6rem .9rem; font-size: .83rem; }
+    .sep { border: none; border-top: 1px solid var(--border); }
+    pre { font-family: var(--mono); }
+    code { font-family: var(--mono); font-size: .83em; background: var(--bg3); padding: .1em .32em; border-radius: 4px; }
+    .icon { font-size: .88rem; }
+    .content-html { font-size: .86rem; line-height: 1.7; }
+    .content-html p { margin-bottom: .5rem; }
+    .content-html h1,.content-html h2,.content-html h3 { font-weight: 700; margin: .75rem 0 .35rem; }
+    .content-html ul,.content-html ol { padding-left: 1.5rem; margin-bottom: .5rem; }
+  </style>
+</head>
+<body>
+<div class="app">
+
+  <!-- Header -->
+  <header class="header">
+    <h1>⚡ PhrasePress Dev Tester</h1>
+    <div class="header-url">
+      <input id="base-url" value="http://localhost:3000/api/v1" placeholder="API base URL" style="min-width:220px" />
+      <input id="hdr-user" value="admin" placeholder="Username" style="width:90px" />
+      <input id="hdr-pass" type="password" placeholder="Password" style="width:100px" onkeydown="if(event.key==='Enter')connect()" />
+      <button class="btn btn-primary" type="button" onclick="connect()">Connetti</button>
+      <span id="auth-status" style="font-size:.78rem;color:var(--muted)"></span>
+    </div>
+    <div style="display:flex;gap:.5rem;margin-left:auto">
+      <button class="btn btn-ghost btn-sm" id="theme-btn" onclick="toggleTheme()">☀ Light</button>
+    </div>
+  </header>
+
+  <div class="body">
+    <!-- Sidebar -->
+    <nav class="sidebar">
+      <div class="tab-section">Overview</div>
+      <button class="tab-btn active" data-tab="dashboard" onclick="switchTab('dashboard')">📊 Dashboard</button>
+
+      <div class="tab-section">Contenuti</div>
+      <div id="sidebar-posttypes"></div>
+
+      <div class="tab-section">Esplora</div>
+      <button class="tab-btn" data-tab="taxonomies" onclick="switchTab('taxonomies')">🏷 Tassonomie</button>
+      <button class="tab-btn" data-tab="schema" onclick="switchTab('schema')">🗂 Schema</button>
+      <button class="tab-btn" data-tab="explorer" onclick="switchTab('explorer')">🔌 API Explorer</button>
+    </nav>
+
+    <!-- Panel -->
+    <main class="panel" id="panel">
+      <div class="loading">Connessione in corso…</div>
+    </main>
+  </div>
+</div>
+
+<!-- Post detail drawer -->
+<div class="detail-overlay" id="overlay" onclick="closeDetail()"></div>
+<div class="detail-drawer" id="drawer">
+  <div class="detail-head">
+    <div style="flex:1">
+      <h2 id="drawer-title">—</h2>
+      <div id="drawer-meta" style="font-size:.75rem;color:var(--muted);margin-top:.2rem"></div>
+    </div>
+    <button class="btn btn-ghost btn-sm" onclick="closeDetail()">✕ Chiudi</button>
+  </div>
+  <div class="detail-body" id="drawer-body"></div>
+</div>
+
+<script>
+  // ─── State ────────────────────────────────────────────────────────────────
+  let BASE = 'http://localhost:3000/api/v1'
+  let ACCESS_TOKEN = ''
+  let postTypes = []
+  let taxonomies = []
+  let currentTab = 'dashboard'
+  let currentPostType = null
+  let listState = { page: 1, limit: 20, status: 'any', search: '', taxFilters: {} }
+
+  // ─── Auth ─────────────────────────────────────────────────────────────────
+  async function connect() {
+    BASE = document.getElementById('base-url').value.replace(/\/$/, '')
+    const username = document.getElementById('hdr-user').value
+    const password = document.getElementById('hdr-pass').value
+    const status = document.getElementById('auth-status')
+    status.textContent = '⏳'
+    status.style.color = 'var(--muted)'
+    try {
+      const res = await fetch(BASE + '/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        status.textContent = '✗ ' + (data.error ?? 'Errore login')
+        status.style.color = 'var(--red)'
+        panel('error', 'Login fallito: ' + (data.error ?? 'credenziali non valide'))
+        return
+      }
+      ACCESS_TOKEN = data.accessToken
+      localStorage.setItem('pp_token', ACCESS_TOKEN)
+      localStorage.setItem('pp_base', BASE)
+      localStorage.setItem('pp_user', username)
+      setAuthStatus(username)
+      init()
+    } catch (e) {
+      status.textContent = '✗ Server non raggiungibile'
+      status.style.color = 'var(--red)'
+      panel('error', 'Impossibile connettersi a ' + BASE)
+    }
+  }
+
+  function setAuthStatus(username) {
+    const status = document.getElementById('auth-status')
+    status.textContent = '✓ ' + username
+    status.style.color = 'var(--green)'
+  }
+
+  // ─── API helpers ─────────────────────────────────────────────────────────
+  async function api(path, opts = {}) {
+    const res = await fetch(BASE + path, {
+      headers: { 'Content-Type': 'application/json', ...(ACCESS_TOKEN ? { Authorization: `Bearer ${ACCESS_TOKEN}` } : {}), ...opts.headers },
+      ...opts,
+    })
+    const body = await res.text()
+    let json
+    try { json = JSON.parse(body) } catch { json = body }
+    return { ok: res.ok, status: res.status, data: json }
+  }
+
+  function esc(s) {
+    return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')
+  }
+
+  function fmt(ts) {
+    return new Date(ts * 1000).toLocaleDateString('it', { day:'2-digit', month:'short', year:'numeric' })
+  }
+
+  // ─── Init ─────────────────────────────────────────────────────────────────
+  async function init() {
+    BASE = document.getElementById('base-url').value.replace(/\/$/, '')
+    panel('loading')
+    const [ptRes, txRes] = await Promise.all([api('/post-types'), api('/taxonomies')])
+
+    if (!ptRes.ok) { panel('error', 'Impossibile connettersi all\'API. Controlla la URL e che il server sia avviato.'); return }
+
+    postTypes = ptRes.data
+    taxonomies = txRes.ok ? txRes.data : []
+
+    // Build sidebar post type links
+    const sidebar = document.getElementById('sidebar-posttypes')
+    sidebar.innerHTML = postTypes.map(pt => `
+      <button class="tab-btn" data-tab="posts-${pt.name}" onclick="switchToPostType('${pt.name}')">
+        📄 ${esc(pt.label)}
+      </button>
+    `).join('')
+
+    switchTab('dashboard')
+  }
+
+  // ─── Tab routing ──────────────────────────────────────────────────────────
+  function switchTab(tab) {
+    currentTab = tab
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'))
+    document.querySelectorAll(`[data-tab="${tab}"]`).forEach(b => b.classList.add('active'))
+
+    if (tab === 'dashboard')   renderDashboard()
+    else if (tab === 'taxonomies') renderTaxonomies()
+    else if (tab === 'schema') renderSchema()
+    else if (tab === 'explorer') renderExplorer()
+  }
+
+  function switchToPostType(name) {
+    currentPostType = name
+    listState = { page: 1, limit: 20, status: 'any', search: '', taxFilters: {} }
+    switchTab(`posts-${name}`)
+    renderPostList()
+  }
+
+  // ─── Panel helpers ────────────────────────────────────────────────────────
+  function panel(type, msg = '') {
+    const p = document.getElementById('panel')
+    if (type === 'loading') p.innerHTML = '<div class="loading">⏳ Caricamento…</div>'
+    else if (type === 'error') p.innerHTML = `<div class="error-msg">⚠ ${esc(msg)}</div>`
+    else p.innerHTML = ''
+    return p
+  }
+
+  // ─── Dashboard ───────────────────────────────────────────────────────────
+  async function renderDashboard() {
+    const p = panel('loading')
+    const r = await api('/stats')
+    const stats = r.ok ? r.data : {}
+
+    let html = `<div class="panel-header"><span class="panel-title">Dashboard</span></div>`
+
+    if (r.ok) {
+      html += `<div class="stats-grid">`
+      for (const [pt, counts] of Object.entries(stats)) {
+        const c = counts
+        const ptLabel = postTypes.find(p => p.name === pt)?.label ?? pt
+        html += `
+          <div class="stat-card" style="cursor:pointer" onclick="switchToPostType('${pt}')">
+            <div class="stat-num">${c.total ?? 0}</div>
+            <div class="stat-lbl">${esc(ptLabel)}</div>
+            <div style="font-size:.75rem;color:var(--muted);margin-top:.25rem">
+              ${c.published ?? 0} pubb. · ${c.draft ?? 0} bozze
+            </div>
+          </div>`
+      }
+      html += `</div>`
+    }
+
+    html += `<div class="card">
+      <div class="card-header"><h3>Post Types registrati</h3></div>
+      <div class="card-body">
+        <div style="display:flex;flex-wrap:wrap;gap:.5rem">
+        ${postTypes.map(pt => `
+          <button class="btn btn-ghost" onclick="switchToPostType('${pt.name}')">
+            📄 ${esc(pt.label)} <span style="font-family:var(--mono);font-size:.75em;color:var(--muted)">${esc(pt.name)}</span>
+          </button>
+        `).join('')}
+        </div>
+      </div>
+    </div>`
+
+    html += `<div class="card">
+      <div class="card-header"><h3>Tassonomie registrate</h3></div>
+      <div class="card-body">
+        <div style="display:flex;flex-wrap:wrap;gap:.5rem">
+        ${taxonomies.map(tx => `
+          <button class="btn btn-ghost" onclick="switchTab('taxonomies')">
+            🏷 ${esc(tx.name)} <span style="font-family:var(--mono);font-size:.75em;color:var(--muted)">${esc(tx.slug)}</span>
+          </button>
+        `).join('')}
+        ${taxonomies.length === 0 ? '<span style="color:var(--muted);font-size:.85rem">Nessuna tassonomia registrata</span>' : ''}
+        </div>
+      </div>
+    </div>`
+
+    p.innerHTML = html
+  }
+
+  // ─── Post List ───────────────────────────────────────────────────────────
+  async function renderPostList() {
+    const pt = postTypes.find(p => p.name === currentPostType)
+    if (!pt) return
+    const p = panel('loading')
+
+    const qs = new URLSearchParams({
+      type:   currentPostType,
+      status: listState.status,
+      page:   listState.page,
+      limit:  listState.limit,
+    })
+    if (listState.search) qs.set('search', listState.search)
+    for (const [k, v] of Object.entries(listState.taxFilters)) {
+      if (v) qs.set(k, v)
+    }
+
+    const r = await api('/posts?' + qs)
+    if (!r.ok) { panel('error', r.data?.error ?? 'Errore API'); return }
+
+    const { data, total, page, pages } = r.data
+
+    // Gather taxonomy options for this post type
+    const relTaxonomies = taxonomies.filter(tx => tx.postTypes.includes(currentPostType))
+    const taxOptions = await Promise.all(
+      relTaxonomies.map(tx => api(`/taxonomies/${tx.slug}/terms`).then(r => ({ tx, terms: r.ok ? (r.data.data ?? []) : [] })))
+    )
+
+    // ── Filters bar ──
+    let html = `<div class="panel-header">
+      <span class="panel-title">${esc(pt.label)}</span>
+      <span style="font-size:.8rem;color:var(--muted)">${total} post totali</span>
+    </div>
+    <div class="filters">
+      <select onchange="listState.status=this.value;listState.page=1;renderPostList()">
+        ${['any','published','draft','trash'].map(s => `<option value="${s}" ${listState.status===s?'selected':''}>${s}</option>`).join('')}
+      </select>
+      <input type="text" placeholder="🔍 Cerca titolo…" value="${esc(listState.search)}"
+        onkeyup="if(event.key==='Enter'){listState.search=this.value;listState.page=1;renderPostList()}"
+        style="min-width:160px"
+      />
+      ${taxOptions.filter(to => to.terms.length).map(({ tx, terms }) => `
+        <select onchange="listState.taxFilters['${tx.slug}']=this.value;listState.page=1;renderPostList()">
+          <option value="">— ${esc(tx.name)} —</option>
+          ${terms.map(t => `<option value="${esc(t.slug)}" ${(listState.taxFilters[tx.slug]||'')==t.slug?'selected':''}>${esc(t.name)}</option>`).join('')}
+        </select>
+      `).join('')}
+      <button class="btn btn-ghost btn-sm" onclick="listState={page:1,limit:20,status:'any',search:'',taxFilters:{}};renderPostList()">✕ Reset</button>
+    </div>`
+
+    if (data.length === 0) {
+      html += `<div class="empty">Nessun post trovato.</div>`
+    } else {
+      html += `<div class="post-list">`
+      for (const post of data) {
+        const termChips = post.terms?.slice(0,4).map(t => `<span class="term-chip" onclick="event.stopPropagation();filterByTerm('${t.taxonomySlug}','${t.termSlug}')">${esc(t.termName)}</span>`).join('')
+        html += `<div class="post-item" onclick="openDetail(${post.id})">
+          <div class="post-item-main">
+            <h3>${esc(post.title)}</h3>
+            <div class="slug"><code>/${post.postType}/${post.slug}</code></div>
+            ${termChips ? `<div class="terms-list" style="margin-top:.4rem">${termChips}</div>` : ''}
+          </div>
+          <div class="post-item-meta">
+            <div><span class="badge badge-${post.status}">${post.status}</span></div>
+            <div style="margin-top:.35rem">${fmt(post.createdAt)}</div>
+            <div style="margin-top:.15rem;font-size:.72rem">#${post.id}</div>
+          </div>
+        </div>`
+      }
+      html += `</div>`
+    }
+
+    // Pagination
+    if (pages > 1) {
+      html += `<div class="pagination">
+        <button class="btn btn-ghost btn-sm" onclick="listState.page=${Math.max(1,page-1)};renderPostList()" ${page<=1?'disabled':''}>← Prec</button>
+        <span class="page-info">Pagina ${page} di ${pages}</span>
+        <button class="btn btn-ghost btn-sm" onclick="listState.page=${Math.min(pages,page+1)};renderPostList()" ${page>=pages?'disabled':''}>Succ →</button>
+      </div>`
+    }
+
+    p.innerHTML = html
+  }
+
+  function filterByTerm(taxSlug, termSlug) {
+    listState.taxFilters[taxSlug] = termSlug
+    listState.page = 1
+    renderPostList()
+  }
+
+  // ─── Post Detail Drawer ───────────────────────────────────────────────────
+  async function openDetail(id) {
+    document.getElementById('overlay').classList.add('open')
+    const drawer = document.getElementById('drawer')
+    drawer.classList.add('open')
+    document.getElementById('drawer-title').textContent = 'Caricamento…'
+    document.getElementById('drawer-meta').textContent = ''
+    document.getElementById('drawer-body').innerHTML = '<div class="loading">⏳</div>'
+
+    const r = await api(`/posts/${id}`)
+    if (!r.ok) {
+      document.getElementById('drawer-body').innerHTML = `<div class="error-msg">Errore nel caricamento del post.</div>`
+      return
+    }
+    const post = r.data
+    document.getElementById('drawer-title').textContent = post.title
+
+    const pt = postTypes.find(p => p.name === post.postType)
+    document.getElementById('drawer-meta').innerHTML =
+      `<span class="badge badge-${post.status}">${post.status}</span>` +
+      ` &nbsp;${post.postType} &nbsp;·&nbsp; <code>/${post.postType}/${post.slug}</code>` +
+      ` &nbsp;·&nbsp; ${fmt(post.createdAt)}`
+
+    let body = ''
+
+    // Content
+    if (post.content) {
+      body += `<div class="detail-section"><h4>Contenuto</h4><div class="content-html">${post.content}</div></div>`
+    }
+
+    // Custom fields
+    const fieldDefs = pt?.fields ?? []
+    const fields = post.fields ?? {}
+    const allKeys = [...new Set([...fieldDefs.map(f => f.name), ...Object.keys(fields)])]
+    if (allKeys.length > 0 && Object.keys(fields).length > 0) {
+      body += `<div class="detail-section"><h4>Campi personalizzati</h4><div class="fields-grid">`
+      for (const key of allKeys) {
+        const val = fields[key]
+        if (val === undefined || val === null || val === '') continue
+        const def = fieldDefs.find(f => f.name === key)
+        let disp = ''
+        if (Array.isArray(val)) {
+          if (typeof val[0] === 'object') {
+            // Repeater: show as mini table
+            const keys = Object.keys(val[0] ?? {})
+            disp = `<div style="overflow-x:auto"><table style="border-collapse:collapse;font-size:.75rem;width:100%">
+              <thead><tr>${keys.map(k => `<th style="text-align:left;padding:.2rem .4rem;border-bottom:1px solid var(--border);color:var(--muted)">${esc(k)}</th>`).join('')}</tr></thead>
+              <tbody>${val.map(row => `<tr>${keys.map(k => `<td style="padding:.2rem .4rem;border-bottom:1px solid var(--border)">${esc(String(row[k] ?? ''))}</td>`).join('')}</tr>`).join('')}</tbody>
+            </table></div>`
+          } else {
+            disp = val.map(v => `<span class="term-chip">${esc(String(v))}</span>`).join(' ')
+          }
+        } else if (typeof val === 'boolean') {
+          disp = val ? '✅ Sì' : '❌ No'
+        } else {
+          disp = `<span class="field-val">${esc(String(val))}</span>`
+        }
+        body += `<span class="field-key">${esc(def?.label ?? key)}</span><div>${disp}</div>`
+      }
+      body += `</div></div>`
+    }
+
+    // Terms
+    if (post.terms?.length) {
+      const byTax = {}
+      for (const t of post.terms) {
+        if (!byTax[t.taxonomyName]) byTax[t.taxonomyName] = []
+        byTax[t.taxonomyName].push(t)
+      }
+      body += `<div class="detail-section"><h4>Tassonomie</h4>`
+      for (const [taxName, terms] of Object.entries(byTax)) {
+        body += `<div style="margin-bottom:.5rem"><span style="font-size:.78rem;color:var(--muted);margin-right:.35rem">${esc(taxName)}</span>
+          <div class="terms-list" style="display:inline-flex;flex-wrap:wrap;gap:.3rem">
+            ${terms.map(t => `<span class="term-chip">${esc(t.termName)}</span>`).join('')}
+          </div></div>`
+      }
+      body += `</div>`
+    }
+
+    // Raw JSON toggle
+    body += `<div class="detail-section">
+      <h4 style="cursor:pointer" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'block':'none'">
+        JSON grezzo ▾
+      </h4>
+      <div style="display:none"><div class="response-box">${esc(JSON.stringify(post, null, 2))}</div></div>
+    </div>`
+
+    // Revisions
+    const revR = await api(`/posts/${id}/revisions`)
+    if (revR.ok && revR.data.length) {
+      body += `<div class="detail-section"><h4>Revisioni (${revR.data.length})</h4>
+        <div style="display:flex;flex-direction:column;gap:.35rem">
+        ${revR.data.map(rev => `
+          <div style="display:flex;align-items:center;gap:.75rem;padding:.4rem .75rem;background:var(--bg3);border-radius:6px;font-size:.8rem">
+            <span style="color:var(--muted)">#${rev.id}</span>
+            <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(rev.title)}</span>
+            <span style="color:var(--muted)">${fmt(rev.createdAt)}</span>
+          </div>
+        `).join('')}
+        </div>
+      </div>`
+    }
+
+    document.getElementById('drawer-body').innerHTML = body
+  }
+
+  function closeDetail() {
+    document.getElementById('overlay').classList.remove('open')
+    document.getElementById('drawer').classList.remove('open')
+  }
+
+  // ─── Taxonomies ───────────────────────────────────────────────────────────
+  async function renderTaxonomies() {
+    const p = panel('loading')
+    if (!taxonomies.length) { p.innerHTML = '<div class="empty">Nessuna tassonomia registrata.</div>'; return }
+
+    const termsBySlug = {}
+    await Promise.all(taxonomies.map(async tx => {
+      const r = await api(`/taxonomies/${tx.slug}/terms?hierarchical=true`)
+      termsBySlug[tx.slug] = r.ok ? (r.data.data ?? []) : []
+    }))
+
+    let html = `<div class="panel-header"><span class="panel-title">Tassonomie</span></div><div class="tax-grid">`
+    for (const tx of taxonomies) {
+      const terms = termsBySlug[tx.slug] ?? []
+      const flat = flatTerms(terms)
+      const bodyId = `tax-body-${tx.slug}`
+      html += `<div class="tax-card">
+        <div class="tax-card-header" onclick="var b=document.getElementById('${bodyId}');b.style.display=b.style.display==='flex'?'none':'flex'">
+          <span class="tax-name">${esc(tx.name)}</span>
+          <span class="tax-slug">${esc(tx.slug)}</span>
+          <span class="badge badge-default">${flat.length}</span>
+        </div>
+        <div id="${bodyId}" class="tax-terms" style="display:none;flex-wrap:wrap;gap:.35rem;padding:.65rem .75rem">
+          ${flat.map(t => `
+            <span class="term-chip" title="${t.postCount} post" onclick="filterByTermAndGo('${tx.slug}','${t.slug}',${t.postCount})">
+              ${esc(t.name)} <span style="opacity:.6;font-size:.7em">${t.postCount}</span>
+            </span>
+          `).join('') || '<span style="color:var(--muted);font-size:.8rem">Nessun termine</span>'}
+        </div>
+      </div>`
+    }
+    html += `</div>`
+    p.innerHTML = html
+  }
+
+  function flatTerms(tree, depth = 0) {
+    const result = []
+    for (const t of tree) {
+      result.push({ ...t, _depth: depth })
+      if (t.children?.length) result.push(...flatTerms(t.children, depth + 1))
+    }
+    return result
+  }
+
+  function filterByTermAndGo(taxSlug, termSlug, count) {
+    if (count === 0) return
+    const relPt = postTypes.find(pt => {
+      const tx = taxonomies.find(t => t.slug === taxSlug)
+      return tx?.postTypes.includes(pt.name)
+    })
+    if (!relPt) return
+    currentPostType = relPt.name
+    listState = { page: 1, limit: 20, status: 'any', search: '', taxFilters: { [taxSlug]: termSlug } }
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'))
+    document.querySelectorAll(`[data-tab="posts-${relPt.name}"]`).forEach(b => b.classList.add('active'))
+    currentTab = `posts-${relPt.name}`
+    renderPostList()
+  }
+
+  // ─── Schema ───────────────────────────────────────────────────────────────
+  function renderSchema() {
+    const p = document.getElementById('panel')
+    let html = `<div class="panel-header"><span class="panel-title">Schema post types</span></div><div class="schema-grid">`
+    for (const pt of postTypes) {
+      const fields = pt.fields ?? []
+      html += `<div class="card">
+        <div class="card-header">
+          <h3>📄 ${esc(pt.label)}</h3>
+          <code style="font-size:.75rem">${esc(pt.name)}</code>
+        </div>
+        <div class="card-body">`
+      if (!fields.length) {
+        html += `<div style="color:var(--muted);font-size:.82rem">Nessun campo personalizzato.</div>`
+      } else {
+        for (const f of fields) {
+          html += `<div class="schema-field">
+            <span class="schema-field-name">${esc(f.label ?? f.name)}</span>
+            <span class="field-type-badge">${esc(f.type)}</span>
+            ${f.required  ? '<span class="schema-flag">required</span>'  : ''}
+            ${f.queryable ? '<span class="schema-flag">index</span>' : ''}
+          </div>`
+        }
+      }
+      // Related taxonomies
+      const relTax = taxonomies.filter(tx => tx.postTypes.includes(pt.name))
+      if (relTax.length) {
+        html += `<hr class="sep" style="margin:.5rem 0">
+          <div style="font-size:.72rem;color:var(--muted);font-weight:700;text-transform:uppercase;margin-bottom:.35rem">Tassonomie</div>
+          <div style="display:flex;flex-wrap:wrap;gap:.3rem">
+            ${relTax.map(tx => `<span class="term-chip" style="cursor:default">${esc(tx.name)}</span>`).join('')}
+          </div>`
+      }
+      html += `</div></div>`
+    }
+    html += `</div>`
+    p.innerHTML = html
+  }
+
+  // ─── API Explorer ─────────────────────────────────────────────────────────
+  function renderExplorer() {
+    const p = document.getElementById('panel')
+
+    const quickLinks = [
+      ['GET', '/stats'],
+      ['GET', '/post-types'],
+      ['GET', '/taxonomies'],
+      ['GET', '/posts?type=post&status=any&limit=5'],
+      ['GET', '/posts?type=page&status=any&limit=5'],
+      ...taxonomies.map(tx => ['GET', `/taxonomies/${tx.slug}/terms`]),
+    ]
+
+    p.innerHTML = `
+      <div class="panel-header"><span class="panel-title">API Explorer</span></div>
+
+      <div class="card">
+        <div class="card-header"><h3>Richiesta</h3></div>
+        <div class="card-body" style="display:flex;flex-direction:column;gap:.75rem">
+          <div class="explorer-form">
+            <select id="ex-method" style="width:90px">
+              <option>GET</option><option>POST</option><option>PUT</option><option>DELETE</option>
+            </select>
+            <span style="align-self:center;color:var(--muted);font-size:.82rem">${esc(BASE)}</span>
+            <input id="ex-path" type="text" placeholder="/posts?type=post" value="/stats" style="flex:1;min-width:200px;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:.35rem .65rem;font:inherit;font-size:.82rem;outline:none" />
+            <button class="btn btn-primary" onclick="runExplorer()">▶ Invia</button>
+          </div>
+          <div>
+            <div style="font-size:.75rem;color:var(--muted);margin-bottom:.3rem">Body (JSON) — per POST/PUT</div>
+            <textarea class="explorer-body-area" id="ex-body" placeholder='{ "key": "value" }'></textarea>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header"><h3>Link rapidi</h3></div>
+        <div class="card-body" style="display:flex;flex-wrap:wrap;gap:.4rem">
+          ${quickLinks.map(([m, path]) => `
+            <button class="btn btn-ghost btn-sm" onclick="loadQuick('${m}','${path}')">
+              <span style="font-family:var(--mono);font-size:.7rem;color:var(--accent2)">${m}</span> ${esc(path)}
+            </button>
+          `).join('')}
+        </div>
+      </div>
+
+      <div id="ex-response"></div>
+    `
+  }
+
+  function loadQuick(method, path) {
+    document.getElementById('ex-method').value = method
+    document.getElementById('ex-path').value = path
+    runExplorer()
+  }
+
+  async function runExplorer() {
+    const method = document.getElementById('ex-method').value
+    const path   = document.getElementById('ex-path').value
+    const rawBody = document.getElementById('ex-body').value.trim()
+
+    const opts = { method }
+    if (rawBody && ['POST','PUT','PATCH'].includes(method)) {
+      opts.body = rawBody
+    }
+
+    const t0 = Date.now()
+    let res, text
+    try {
+      res  = await fetch(BASE + path, { headers: { 'Content-Type': 'application/json' }, ...opts })
+      text = await res.text()
+    } catch (e) {
+      document.getElementById('ex-response').innerHTML =
+        `<div class="error-msg">Errore di rete: ${esc(e.message)}</div>`
+      return
+    }
+
+    const elapsed = Date.now() - t0
+    let pretty = text
+    try { pretty = JSON.stringify(JSON.parse(text), null, 2) } catch {}
+
+    const statusClass = res.ok ? 'status-ok' : 'status-err'
+    document.getElementById('ex-response').innerHTML = `
+      <div class="card">
+        <div class="card-header">
+          <h3>Risposta</h3>
+          <div class="response-info">
+            <span class="${statusClass}">${res.status} ${res.statusText}</span>
+            <span style="color:var(--muted)">${elapsed}ms</span>
+            <span style="color:var(--muted)">${text.length} byte</span>
+            <button class="btn btn-ghost btn-sm" onclick="navigator.clipboard.writeText(document.getElementById('resp-pre').textContent)">⎘ Copia</button>
+          </div>
+        </div>
+        <div class="response-box" id="resp-pre">${esc(pretty)}</div>
+      </div>`
+  }
+
+  // Press Esc to close drawer
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') closeDetail() })
+
+  // ─── Theme ────────────────────────────────────────────────────────────────
+  function toggleTheme() {
+    const html = document.documentElement
+    const isDark = html.dataset.theme === 'dark'
+    html.dataset.theme = isDark ? 'light' : 'dark'
+    document.getElementById('theme-btn').textContent = isDark ? '🌙 Dark' : '☀ Light'
+  }
+
+  // ─── Boot ─────────────────────────────────────────────────────────────────
+
+  // Ricezione token dal parent (quando aperto come iframe dentro l'admin)
+  window.addEventListener('message', (e) => {
+    if (e.data?.type !== 'pp-auth') return
+    if (!e.data.token) return
+    ACCESS_TOKEN = e.data.token
+    if (e.data.base) {
+      BASE = e.data.base
+      document.getElementById('base-url').value = e.data.base
+    }
+    document.querySelector('.header').style.display = 'none'
+    document.querySelector('.app').style.gridTemplateRows = '1fr'
+    setAuthStatus('admin')
+    init()
+  })
+
+  document.addEventListener('DOMContentLoaded', () => {
+    const savedToken = localStorage.getItem('pp_token')
+    const savedBase  = localStorage.getItem('pp_base')
+    const savedUser  = localStorage.getItem('pp_user')
+    if (savedToken && savedBase) {
+      ACCESS_TOKEN = savedToken
+      BASE = savedBase
+      document.getElementById('base-url').value = savedBase
+      if (savedUser) document.getElementById('hdr-user').value = savedUser
+      setAuthStatus(savedUser ?? '?')
+      init()
+    } else {
+      document.getElementById('hdr-pass').focus()
+    }
+  })
+</script>
+</body>
+</html>

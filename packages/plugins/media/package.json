@@ -1,0 +1,20 @@
+{
+  "name": "@phrasepress/plugin-media",
+  "version": "1.0.0",
+  "description": "Media library plugin for PhrasePress",
+  "type": "module",
+  "main": "./src/index.ts",
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@phrasepress/core": "workspace:*"
+  },
+  "devDependencies": {
+    "@fastify/multipart": "^9.0.3",
+    "@types/node": "^22.0.0",
+    "drizzle-orm": "^0.40.1",
+    "fastify": "^5.2.1",
+    "typescript": "^5.7.3"
+  }
+}

@@ -1,0 +1,30 @@
+# dipendenze
+node_modules/
+
+# build output
+dist/
+packages/admin/dist/
+
+# database SQLite
+data/
+
+# variabili d'ambiente
+.env
+
+# upload media (plugin)
+uploads/
+
+# log
+*.log
+logs/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# editor
+.vscode/settings.json
+*.swp
+
+# drizzle migrations intermedie
+packages/core/src/db/migrations/meta/

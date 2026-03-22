@@ -1,0 +1,10 @@
+node_modules
+dist
+packages/*/node_modules
+packages/*/dist
+packages/core/data
+uploads
+.env
+.git
+.gitignore
+*.log
