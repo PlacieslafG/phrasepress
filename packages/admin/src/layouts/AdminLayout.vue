@@ -3,6 +3,7 @@
     <!-- Header -->
     <header
       class="flex items-center justify-between px-4 h-14 bg-surface-card border-b border-surface-border shrink-0"
+      :style="{ color: themeStore.isDark ? '#e2e8f0' : '#334155' }"
     >
       <div class="flex items-center gap-3">
         <button class="hbtn" @click="sidebarOpen = !sidebarOpen">
@@ -216,8 +217,3 @@ async function handleLogout() {
   window.location.replace('/login')
 }
 </script>
-
-<style>
-.hbtn { color: #334155; }
-.dark .hbtn { color: #e2e8f0; }
-</style>
