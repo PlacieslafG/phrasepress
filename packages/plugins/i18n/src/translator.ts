@@ -125,6 +125,10 @@ export async function translateText(
       body: JSON.stringify({
         model:       config.model,
         temperature: 0.2,        // bassa creatività = traduzioni consistenti e accurate
+        // Disabilita il thinking mode di Qwen3 (e modelli simili con reasoning integrato).
+        // Senza questo, llama.cpp con Qwen3 entra in un loop di ragionamento infinito
+        // consumando tutti i token senza mai produrre la risposta nel campo `content`.
+        chat_template_kwargs: { enable_thinking: false },
         messages: [
           { role: 'system', content: systemMessage },
           { role: 'user',   content: userMessage },
