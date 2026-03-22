@@ -1,5 +1,5 @@
 <template>
-  <div class="flex flex-col gap-2">
+  <div class="flex flex-col gap-1 w-full min-w-0 overflow-hidden">
 
     <div v-if="loadingLocales" class="text-surface-400 text-xs py-1">Caricamento...</div>
 
@@ -14,26 +14,25 @@
         v-for="locale in locales"
         :key="locale.code"
         type="button"
-        class="w-full flex items-center justify-between gap-2 py-1.5 px-2 rounded-lg hover:bg-surface-800 transition-colors text-left"
+        class="w-full min-w-0 flex items-center gap-2 py-1.5 px-2 rounded-lg hover:bg-surface-800 transition-colors text-left overflow-hidden"
         @click="openDrawer(locale)"
       >
-        <div class="flex flex-col min-w-0">
+        <div class="flex flex-col min-w-0 flex-1 overflow-hidden">
           <span class="text-sm font-medium leading-tight truncate">{{ locale.label }}</span>
-          <code class="text-xs text-surface-500">{{ locale.code }}</code>
+          <code class="text-xs text-surface-500 truncate">{{ locale.code }}</code>
         </div>
 
-        <div class="flex items-center gap-1.5 shrink-0">
+        <div class="flex items-center gap-1 shrink-0">
           <span
             v-if="translatingLocale === locale.code"
             class="pi pi-spinner pi-spin text-xs text-surface-400"
           />
           <Tag
             v-else-if="getTranslation(locale.code)"
-            :value="getTranslation(locale.code)!.isDirty ? 'Obsoleta' : 'Tradotta'"
+            :value="getTranslation(locale.code)!.isDirty ? 'Obs.' : 'OK'"
             :severity="getTranslation(locale.code)!.isDirty ? 'warn' : 'success'"
-            class="!text-[10px] !py-0 !px-1.5"
+            class="!text-[10px] !py-0 !px-1"
           />
-
           <i class="pi pi-angle-right text-xs text-surface-500" />
         </div>
       </button>
