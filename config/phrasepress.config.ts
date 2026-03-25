@@ -30,5 +30,6 @@ export default defineConfig({
     (await import('../packages/plugins/forms/src/index.js')).default,
     (await import('../packages/plugins/mailer/src/index.js')).default,
     (await import('../packages/plugins/i18n/src/index.js')).default,
+    (await import('../packages/plugins/db-monitor/src/index.js')).default,
   ],
 })

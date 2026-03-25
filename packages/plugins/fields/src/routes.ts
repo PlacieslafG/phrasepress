@@ -17,6 +17,7 @@ function serializeItem(item: FieldItemRow) {
     type:         item.type,
     required:     item.required === 1,
     queryable:    item.queryable === 1,
+    translatable: item.translatable === 1,
     options:      JSON.parse(item.options) as string[],
     fieldOptions: JSON.parse(item.fieldOptions) as Record<string, unknown>,
     defaultValue: item.defaultValue != null ? JSON.parse(item.defaultValue) as unknown : null,
@@ -41,7 +42,7 @@ function serializeGroup(group: FieldGroupRow, items: FieldItemRow[]) {
 type GroupBody = { name: string; description?: string; postTypes?: string[] }
 type FieldBody = {
   name: string; label?: string; type: string
-  required?: boolean; queryable?: boolean; options?: string[]
+  required?: boolean; queryable?: boolean; translatable?: boolean; options?: string[]
   fieldOptions?: Record<string, unknown>; defaultValue?: unknown
 }
 
@@ -64,6 +65,7 @@ const fieldBodySchema = {
     type:         { type: 'string' },
     required:     { type: 'boolean' },
     queryable:    { type: 'boolean' },
+    translatable: { type: 'boolean' },
     options:      { type: 'array', items: { type: 'string' } },
     fieldOptions: { type: 'object' },
     defaultValue: {},

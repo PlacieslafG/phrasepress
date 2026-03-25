@@ -107,6 +107,14 @@
             @click="saveSettings"
           />
           <Button
+            label="Ping server"
+            icon="pi pi-wifi"
+            severity="secondary"
+            outlined
+            :loading="pinging"
+            @click="doPing"
+          />
+          <Button
             label="Testa connessione"
             icon="pi pi-bolt"
             severity="secondary"
@@ -256,6 +264,7 @@ const loadingSettings = ref(false)
 const saving         = ref(false)
 const testing        = ref(false)
 const testResult     = ref<'ok' | 'error' | null>(null)
+const pinging        = ref(false)
 
 const defaultPromptPlaceholder = `Translate the following {sourceLocaleName} text to {targetLocaleName} ({targetLocale}).
 
@@ -304,6 +313,24 @@ async function saveSettings() {
     toast.add({ severity: 'error', summary: 'Errore salvataggio', life: 3000 })
   } finally {
     saving.value = false
+  }
+}
+
+async function doPing() {
+  pinging.value = true
+  try {
+    const res = await i18nApi.pingServer()
+    toast.add({
+      severity: 'success',
+      summary:  'Ping riuscito',
+      detail:   res.message + ' — se Testa connessione rimane in attesa, il motore LLM è occupato: riavvia il server LLM per svuotare la coda.',
+      life:     6000,
+    })
+  } catch (err: unknown) {
+    const msg = (err as { message?: string })?.message ?? 'Server non raggiungibile'
+    toast.add({ severity: 'warn', summary: 'Ping fallito', detail: msg, life: 4000 })
+  } finally {
+    pinging.value = false
   }
 }
 

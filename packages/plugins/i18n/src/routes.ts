@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto'
 import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify'
 import type { PluginContext } from '@phrasepress/core'
 import {
@@ -6,8 +7,9 @@ import {
   dbGetConfig, dbUpsertConfig,
   serializeLocale, serializeTranslation, serializeConfig,
   ensureUniqueTranslationSlug,
+  type LocaleRow,
 } from './db.js'
-import { translateText, translateFields, testConnection, TranslatorError, type TranslatorConfig } from './translator.js'
+import { translateText, translateFields, testConnection, pingServer, TranslatorError, type TranslatorConfig } from './translator.js'
 
 // Inlined to avoid a runtime import of @phrasepress/core (no dist/ in dev)
 function generateSlug(title: string): string {
@@ -50,6 +52,68 @@ function getSourcePost(ctx: PluginContext, postId: number) {
     fields:   JSON.parse(raw.fields) as Record<string, unknown>,
     status:   raw.status,
   } : null
+}
+
+// Recupera i field defs completi passando per il filtro post_types.meta.
+// Necessario per includere i campi definiti tramite il fields plugin (non solo quelli statici del registry).
+async function getFieldDefs(
+  ctx: PluginContext,
+  postType: string,
+): Promise<Array<{ name: string; type: string; fieldOptions?: Record<string, unknown> }>> {
+  const base = ctx.postTypes.getAll()
+  const filtered = await ctx.hooks.applyFilters('post_types.meta', base) as Array<{ name: string; fields?: Array<{ name: string; type: string; fieldOptions?: Record<string, unknown> }> }>
+  return filtered.find(pt => pt.name === postType)?.fields ?? []
+}
+
+// ─── Background translation jobs ────────────────────────────────────────────
+
+export interface TranslateAllJob {
+  status:    'running' | 'done'
+  total:     number
+  completed: number
+  failed:    number
+  createdAt: number
+}
+
+const jobs = new Map<string, TranslateAllJob>()
+
+function pruneJobs(): void {
+  const cutoff = Date.now() - 3_600_000
+  for (const [id, job] of jobs) {
+    if (job.createdAt < cutoff) jobs.delete(id)
+  }
+}
+
+async function runTranslateAll(
+  ctx:     PluginContext,
+  jobId:   string,
+  postId:  number,
+  post:    { id: number; postType: string; title: string; content: string; fields: Record<string, unknown>; status: string },
+  config:  TranslatorConfig,
+  locales: LocaleRow[],
+): Promise<void> {
+  const job = jobs.get(jobId)!
+  for (const localeRow of locales) {
+    try {
+      const [translatedTitle, translatedContent] = await Promise.all([
+        translateText(config, post.title,   localeRow.code),
+        translateText(config, post.content, localeRow.code, true),
+      ])
+      const fieldDefs = await getFieldDefs(ctx, post.postType)
+      const translatedFields = await translateFields(config, post.fields, fieldDefs, localeRow.code)
+      const existing  = dbGetTranslation(ctx.db, postId, localeRow.code)
+      const baseSlug  = generateSlug(translatedTitle)
+      const finalSlug = ensureUniqueTranslationSlug(ctx.db, localeRow.code, baseSlug, existing?.id)
+      dbUpsertTranslation(ctx.db, {
+        postId, locale: localeRow.code, title: translatedTitle, slug: finalSlug,
+        content: translatedContent, fields: translatedFields, status: post.status, isDirty: false,
+      })
+      job.completed++
+    } catch {
+      job.failed++
+    }
+  }
+  job.status = 'done'
 }
 
 // ─── Route registration ───────────────────────────────────────────────────────
@@ -243,8 +307,8 @@ export async function registerI18nRoutes(app: FastifyInstance, ctx: PluginContex
         translateText(config, post.content, locale, true),
       ])
 
-      // Recupera field definitions per sapere quali campi tradurre
-      const fieldDefs = ctx.postTypes.get(post.postType)?.fields ?? []
+      // Recupera field definitions tramite il filtro hook per includere i campi del fields plugin
+      const fieldDefs = await getFieldDefs(ctx, post.postType)
       const translatedFields = await translateFields(config, post.fields, fieldDefs, locale)
 
       const existingTranslation = dbGetTranslation(ctx.db, postId, locale)
@@ -270,7 +334,7 @@ export async function registerI18nRoutes(app: FastifyInstance, ctx: PluginContex
     }
   })
 
-  // ── POST /posts/:postId/translate-all — traduce verso tutte le lingue ─────
+  // ── POST /posts/:postId/translate-all — avvia traduzione asincrona ────────
   app.post<{ Params: { postId: string } }>('/posts/:postId/translate-all', {
     preHandler: auth,
   }, async (req: FastifyRequest<{ Params: { postId: string } }>, reply: FastifyReply) => {
@@ -286,42 +350,24 @@ export async function registerI18nRoutes(app: FastifyInstance, ctx: PluginContex
     }
 
     const locales = dbListLocales(ctx.db).filter(l => l.code !== config.sourceLocale)
-    const results = []
 
-    for (const localeRow of locales) {
-      try {
-        const [translatedTitle, translatedContent] = await Promise.all([
-          translateText(config, post.title,   localeRow.code),
-          translateText(config, post.content, localeRow.code, true),
-        ])
-        const fieldDefs = ctx.postTypes.get(post.postType)?.fields ?? []
-        const translatedFields = await translateFields(config, post.fields, fieldDefs, localeRow.code)
+    pruneJobs()
+    const jobId = randomUUID()
+    jobs.set(jobId, { status: 'running', total: locales.length, completed: 0, failed: 0, createdAt: Date.now() })
 
-        const existing  = dbGetTranslation(ctx.db, postId, localeRow.code)
-        const baseSlug  = generateSlug(translatedTitle)
-        const finalSlug = ensureUniqueTranslationSlug(ctx.db, localeRow.code, baseSlug, existing?.id)
+    // Avvia in background — non blocca la risposta HTTP
+    void runTranslateAll(ctx, jobId, postId, post, config, locales)
 
-        const row = dbUpsertTranslation(ctx.db, {
-          postId,
-          locale:  localeRow.code,
-          title:   translatedTitle,
-          slug:    finalSlug,
-          content: translatedContent,
-          fields:  translatedFields,
-          status:  post.status,
-          isDirty: false,
-        })
-        results.push({ locale: localeRow.code, ok: true, translation: serializeTranslation(row) })
-      } catch (err) {
-        results.push({
-          locale: localeRow.code,
-          ok:     false,
-          error:  err instanceof TranslatorError ? err.message : String(err),
-        })
-      }
-    }
+    return reply.status(202).send({ jobId, total: locales.length })
+  })
 
-    return results
+  // ── GET /jobs/:jobId — stato di un job di traduzione ─────────────────────
+  app.get<{ Params: { jobId: string } }>('/jobs/:jobId', {
+    preHandler: auth,
+  }, async (req: FastifyRequest<{ Params: { jobId: string } }>, reply: FastifyReply) => {
+    const job = jobs.get(req.params.jobId)
+    if (!job) return reply.status(404).send({ error: 'Job not found or expired' })
+    return job
   })
 
   // ── GET /settings ────────────────────────────────────────────────────────
@@ -363,6 +409,16 @@ export async function registerI18nRoutes(app: FastifyInstance, ctx: PluginContex
   app.post('/settings/test', { preHandler: auth }, async (_req, reply) => {
     const config = getTranslatorConfig(ctx)
     const result = await testConnection(config)
+    if (!result.ok) {
+      return reply.status(502).send({ error: result.message })
+    }
+    return { message: result.message }
+  })
+
+  // ── GET /settings/ping — ping rapido senza inferenza LLM ─────────────────
+  app.get('/settings/ping', { preHandler: auth }, async (_req, reply) => {
+    const config = getTranslatorConfig(ctx)
+    const result = await pingServer(config)
     if (!result.ok) {
       return reply.status(502).send({ error: result.message })
     }

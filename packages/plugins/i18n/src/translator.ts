@@ -78,9 +78,33 @@ function buildUserMessage(
 }
 
 // Timeout default per le traduzioni: 120s (i modelli LLM grandi sono lenti)
-// Timeout per il test di connessione: 30s
+// Il test usa 60s: genera pochi token, se ci vuole di più il motore è in coda/bloccato
 const DEFAULT_TIMEOUT_MS = 120_000
-const TEST_TIMEOUT_MS    = 30_000
+const TEST_TIMEOUT_MS    = 60_000
+
+// Rimuove i src base64 dalle immagini prima di mandare l'HTML all'LLM.
+// Le immagini non si traducono: inviare blob base64 gonfia il prompt inutilmente
+// e può bloccare il modello o causare timeout.
+function stripBase64Images(html: string): string {
+  return html.replace(/(<img\b[^>]*?\bsrc=["'])data:[^"']*?(["'][^>]*?>)/gi, '$1$2')
+}
+
+// Estrae i tag <img> dall'HTML e li sostituisce con placeholder [PP_IMG_N].
+// Impedisce all'LLM di perdere le immagini durante la traduzione.
+// I src base64 vengono rimossi per non gonfiare l'array images.
+function extractImages(html: string): { html: string; images: string[] } {
+  const images: string[] = []
+  const result = html.replace(/<img\b[^>]*>/gi, (match) => {
+    const cleaned = match.replace(/(\bsrc=["'])data:[^"']*(["])/gi, '$1$2')
+    images.push(cleaned)
+    return `[PP_IMG_${images.length - 1}]`
+  })
+  return { html: result, images }
+}
+
+function restoreImages(html: string, images: string[]): string {
+  return html.replace(/\[PP_IMG_(\d+)\]/gi, (_, idx) => images[Number(idx)] ?? '')
+}
 
 export async function translateText(
   config: TranslatorConfig,
@@ -88,8 +112,13 @@ export async function translateText(
   targetLocale: string,
   isHtml = false,
   timeoutMs = DEFAULT_TIMEOUT_MS,
+  maxTokens?: number,
 ): Promise<string> {
   if (!text.trim()) return text   // non chiamare l'LLM per testi vuoti
+
+  const { html: processedText, images: extractedImages } = isHtml
+    ? extractImages(text)
+    : { html: text, images: [] as string[] }
 
   if (!config.baseUrl || !config.model) {
     throw new TranslatorError('LLM not configured: baseUrl and model are required')
@@ -97,7 +126,7 @@ export async function translateText(
 
   const userMessage = buildUserMessage(
     config.promptTemplate ?? DEFAULT_PROMPT_TEMPLATE,
-    text,
+    processedText,
     config.sourceLocale,
     targetLocale,
   )
@@ -116,24 +145,28 @@ export async function translateText(
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), timeoutMs)
 
+  function buildBody(withThinkingKwargs: boolean) {
+    return JSON.stringify({
+      model:       config.model,
+      temperature: 0.2,
+      // chat_template_kwargs è specifico di llama.cpp + Qwen3: disabilita il thinking mode.
+      // Non è supportato da cloud API (Groq, OpenAI, ecc.): verrà escluso al retry se 400.
+      ...(withThinkingKwargs ? { chat_template_kwargs: { enable_thinking: false } } : {}),
+      ...(maxTokens !== undefined ? { max_tokens: maxTokens } : {}),
+      messages: [
+        { role: 'system', content: systemMessage },
+        { role: 'user',   content: userMessage },
+      ],
+    })
+  }
+
   let response: Response
   try {
     response = await fetch(url, {
       method: 'POST',
       headers,
       signal: controller.signal,
-      body: JSON.stringify({
-        model:       config.model,
-        temperature: 0.2,        // bassa creatività = traduzioni consistenti e accurate
-        // Disabilita il thinking mode di Qwen3 (e modelli simili con reasoning integrato).
-        // Senza questo, llama.cpp con Qwen3 entra in un loop di ragionamento infinito
-        // consumando tutti i token senza mai produrre la risposta nel campo `content`.
-        chat_template_kwargs: { enable_thinking: false },
-        messages: [
-          { role: 'system', content: systemMessage },
-          { role: 'user',   content: userMessage },
-        ],
-      }),
+      body: buildBody(true),
     })
   } catch (err) {
     if (err instanceof Error && err.name === 'AbortError') {
@@ -142,6 +175,32 @@ export async function translateText(
     throw new TranslatorError(`LLM request failed: ${String(err)}`, err)
   } finally {
     clearTimeout(timer)
+  }
+
+  // Alcuni server (Groq, OpenAI) non supportano chat_template_kwargs: riprova senza
+  if (response.status === 400) {
+    const errBody = await response.text().catch(() => '')
+    if (errBody.includes('chat_template_kwargs')) {
+      const controller2 = new AbortController()
+      const timer2 = setTimeout(() => controller2.abort(), timeoutMs)
+      try {
+        response = await fetch(url, {
+          method: 'POST',
+          headers,
+          signal: controller2.signal,
+          body: buildBody(false),
+        })
+      } catch (err) {
+        if (err instanceof Error && err.name === 'AbortError') {
+          throw new TranslatorError(`LLM request timed out after ${timeoutMs / 1000}s`)
+        }
+        throw new TranslatorError(`LLM request failed: ${String(err)}`, err)
+      } finally {
+        clearTimeout(timer2)
+      }
+    } else {
+      throw new TranslatorError(`LLM returned HTTP 400: ${errBody}`)
+    }
   }
 
   if (!response.ok) {
@@ -165,20 +224,40 @@ export async function translateText(
     throw new TranslatorError('LLM returned empty or unexpected response')
   }
 
-  return content.trim()
+  return extractedImages.length > 0
+    ? restoreImages(content.trim(), extractedImages)
+    : content.trim()
 }
 
-// Traduce un set di campi — salta i tipi non testuali
+// Traduce un set di campi — traduce i tipi testuali, gestisce i repeater ricorsivamente
 export async function translateFields(
   config: TranslatorConfig,
   fields: Record<string, unknown>,
-  fieldDefs: Array<{ name: string; type: string }>,
+  fieldDefs: Array<{ name: string; type: string; translatable?: boolean; fieldOptions?: Record<string, unknown> }>,
   targetLocale: string,
 ): Promise<Record<string, unknown>> {
   const TRANSLATABLE_TYPES = new Set(['string', 'textarea', 'richtext'])
   const result: Record<string, unknown> = { ...fields }
 
   for (const def of fieldDefs) {
+    // Salta esplicitamente i campi marcati translatable: false
+    if (def.translatable === false) continue
+
+    if (def.type === 'repeater') {
+      const subFieldDefs = (def.fieldOptions?.subFields as Array<{ name: string; type: string }> | undefined) ?? []
+      const rows = (fields[def.name] as Record<string, unknown>[] | undefined) ?? []
+      result[def.name] = await Promise.all(rows.map(async row => {
+        const translatedRow: Record<string, unknown> = { ...row }
+        for (const sf of subFieldDefs) {
+          if (!TRANSLATABLE_TYPES.has(sf.type)) continue
+          const val = row[sf.name]
+          if (typeof val !== 'string' || !val.trim()) continue
+          translatedRow[sf.name] = await translateText(config, val, targetLocale, sf.type === 'richtext')
+        }
+        return translatedRow
+      }))
+      continue
+    }
     if (!TRANSLATABLE_TYPES.has(def.type)) continue
     const value = fields[def.name]
     if (typeof value !== 'string' || value.trim() === '') continue
@@ -194,16 +273,52 @@ export async function translateFields(
   return result
 }
 
+// Ping rapido: chiama GET /models senza fare inferenza.
+// Risponde in pochi ms anche se il modello è occupato con richieste in coda.
+// Utile per distinguere "server down" da "server occupato".
+export async function pingServer(config: TranslatorConfig): Promise<{ ok: boolean; message: string }> {
+  if (!config.baseUrl) {
+    return { ok: false, message: 'baseUrl non configurato' }
+  }
+
+  const url = config.baseUrl.replace(/\/$/, '') + '/models'
+  const headers: Record<string, string> = {}
+  if (config.apiKey) headers['Authorization'] = `Bearer ${config.apiKey}`
+
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), 5_000)
+
+  try {
+    const res = await fetch(url, { method: 'GET', headers, signal: controller.signal })
+    clearTimeout(timer)
+    if (!res.ok) {
+      return { ok: false, message: `HTTP ${res.status} — server raggiungibile ma ha risposto con errore` }
+    }
+    interface ModelsResponse { data?: Array<{ id: string }> }
+    const body = await res.json() as ModelsResponse
+    const models = body.data?.map(m => m.id) ?? []
+    const preview = models.slice(0, 3).join(', ') || '(nessun modello elencato)'
+    return { ok: true, message: `Server raggiungibile — modelli: ${preview}` }
+  } catch (err) {
+    clearTimeout(timer)
+    if (err instanceof Error && err.name === 'AbortError') {
+      return { ok: false, message: 'Ping scaduto dopo 5s — server non raggiungibile o firewall' }
+    }
+    return { ok: false, message: `Ping fallito: ${String(err)}` }
+  }
+}
+
 // Verifica che il server LLM sia raggiungibile inviando una traduzione di test
 export async function testConnection(config: TranslatorConfig): Promise<{ ok: boolean; message: string }> {
   const testLocale = config.sourceLocale === 'en' ? 'it' : 'en'
   try {
     const result = await translateText(
       config,
-      'Hello, this is a connection test.',
+      'Hello.',
       testLocale,
       false,
       TEST_TIMEOUT_MS,
+      30,   // max_tokens: la risposta è breve, forziamo il limite per tornare subito
     )
     return { ok: true, message: `Connection OK — "${result}" (${localeName(config.sourceLocale)} → ${localeName(testLocale)})` }
   } catch (err) {

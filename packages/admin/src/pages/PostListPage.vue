@@ -177,7 +177,7 @@ const filterDateFrom = ref<Date | null>(null)
 const filterDateTo   = ref<Date | null>(null)
 
 // Ordinamento
-const sortField = ref<string | null>(null)
+const sortField = ref<string | undefined>(undefined)
 const sortOrder = ref<1 | -1>(1)
 
 // Utenti per il dropdown autore
@@ -237,9 +237,9 @@ function onPage(event: { page: number; rows: number }) {
   loadList()
 }
 
-function onSort(event: { sortField: string; sortOrder: 1 | -1 }) {
-  sortField.value = event.sortField
-  sortOrder.value = event.sortOrder
+function onSort(event: { sortField?: string | ((item: unknown) => string) | null; sortOrder?: 0 | 1 | -1 | null }) {
+  sortField.value = typeof event.sortField === 'string' ? event.sortField : undefined
+  sortOrder.value = (event.sortOrder === 1 || event.sortOrder === -1) ? event.sortOrder : 1
   page.value = 1
   loadList()
 }
@@ -261,7 +261,7 @@ function resetFilters() {
   filterAuthor.value   = null
   filterDateFrom.value = null
   filterDateTo.value   = null
-  sortField.value      = null
+  sortField.value = undefined
   page.value           = 1
   loadList()
 }
@@ -315,7 +315,7 @@ watch(type, () => {
   filterAuthor.value   = null
   filterDateFrom.value = null
   filterDateTo.value   = null
-  sortField.value      = null
+  sortField.value = undefined
   loadList()
 })
 

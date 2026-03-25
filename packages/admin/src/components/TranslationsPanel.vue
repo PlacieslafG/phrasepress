@@ -65,15 +65,30 @@
         </div>
       </template>
 
-      <TranslationEditor
-        v-if="selectedLocale"
-        :locale="selectedLocale"
-        :post-id="postId"
-        :translation="getTranslation(selectedLocale.code) ?? null"
-        :translatable-field-defs="translatableFieldDefs"
-        @saved="onTranslationSaved"
-        @deleted="onTranslationDeleted(selectedLocale.code)"
-      />
+      <template v-if="selectedLocale">
+        <TranslationEditor
+          v-model="drawerForm"
+          :translatable-field-defs="translatableFieldDefs"
+        />
+
+        <div class="flex items-center gap-2 pt-4 mt-2 border-t border-surface-700">
+          <Button
+            label="Salva"
+            icon="pi pi-check"
+            class="flex-1"
+            :loading="drawerSaving"
+            @click="saveDrawerTranslation"
+          />
+          <Button
+            v-if="getTranslation(selectedLocale.code)"
+            icon="pi pi-trash"
+            severity="danger"
+            text
+            :loading="drawerDeleting"
+            @click="deleteDrawerTranslation"
+          />
+        </div>
+      </template>
     </Drawer>
   </div>
 </template>
@@ -84,6 +99,7 @@ import { useToast } from 'primevue/usetoast'
 import { i18nApi } from '@/api/i18n.js'
 import type { Locale, Translation } from '@/api/i18n.js'
 import TranslationEditor from './TranslationEditor.vue'
+import type { TranslationFormState } from './TranslationEditor.vue'
 
 interface FieldDef {
   name: string
@@ -116,6 +132,12 @@ const translatingLocale = ref<string | null>(null)
 // Drawer
 const drawerVisible  = ref(false)
 const selectedLocale = ref<Locale | null>(null)
+const drawerSaving   = ref(false)
+const drawerDeleting = ref(false)
+
+const drawerForm = ref<TranslationFormState>({
+  title: '', slug: '', content: '', fields: {}, status: 'draft',
+})
 
 function getTranslation(locale: string): Translation | undefined {
   return translations.value.find(t => t.locale === locale)
@@ -123,7 +145,39 @@ function getTranslation(locale: string): Translation | undefined {
 
 function openDrawer(locale: Locale) {
   selectedLocale.value = locale
+  const existing = getTranslation(locale.code)
+  drawerForm.value = existing
+    ? { title: existing.title, slug: existing.slug, content: existing.content, fields: { ...existing.fields }, status: existing.status }
+    : { title: '', slug: '', content: '', fields: {}, status: 'draft' }
   drawerVisible.value  = true
+}
+
+async function saveDrawerTranslation() {
+  if (!selectedLocale.value) return
+  drawerSaving.value = true
+  try {
+    const t = await i18nApi.upsertTranslation(props.postId, selectedLocale.value.code, drawerForm.value)
+    onTranslationSaved(t)
+    toast.add({ severity: 'success', summary: 'Traduzione salvata', life: 2000 })
+  } catch (err: unknown) {
+    toast.add({ severity: 'error', summary: 'Errore salvataggio', detail: (err as { message?: string })?.message, life: 4000 })
+  } finally {
+    drawerSaving.value = false
+  }
+}
+
+async function deleteDrawerTranslation() {
+  if (!selectedLocale.value) return
+  drawerDeleting.value = true
+  try {
+    await i18nApi.deleteTranslation(props.postId, selectedLocale.value.code)
+    onTranslationDeleted(selectedLocale.value.code)
+    toast.add({ severity: 'success', summary: 'Traduzione eliminata', life: 2000 })
+  } catch (err: unknown) {
+    toast.add({ severity: 'error', summary: 'Errore eliminazione', detail: (err as { message?: string })?.message, life: 4000 })
+  } finally {
+    drawerDeleting.value = false
+  }
 }
 
 async function load() {
@@ -169,27 +223,33 @@ async function autoTranslateSingle(locale: Locale) {
 
 async function translateAll() {
   translatingAll.value = true
+  const targets = locales.value.filter(l => !l.isDefault)
+  const total = targets.length
+  let successes = 0
   try {
-    const results = await i18nApi.autoTranslateAll(props.postId)
-    for (const r of results) {
-      if (r.ok && r.translation) onTranslationSaved(r.translation)
+    for (const locale of targets) {
+      translatingLocale.value = locale.code
+      try {
+        const t = await i18nApi.autoTranslate(props.postId, locale.code)
+        onTranslationSaved(t)
+        successes++
+      } catch {
+        // continue with next locale
+      }
     }
-    const failures = results.filter(r => !r.ok)
-    if (failures.length === 0) {
-      toast.add({ severity: 'success', summary: 'Traduzione completata', detail: `${results.length} lingue tradotte`, life: 3000 })
+    if (successes === total) {
+      toast.add({ severity: 'success', summary: 'Traduzione completata', detail: `${total} lingue tradotte`, life: 3000 })
     } else {
       toast.add({
         severity: 'warn',
         summary:  'Traduzione parziale',
-        detail:   `${results.length - failures.length} su ${results.length} riuscite`,
+        detail:   `${successes} su ${total} riuscite`,
         life:     4000,
       })
     }
-  } catch (err: unknown) {
-    const msg = (err as { message?: string })?.message ?? 'Errore traduzione'
-    toast.add({ severity: 'error', summary: 'Errore', detail: msg, life: 4000 })
   } finally {
-    translatingAll.value = false
+    translatingAll.value    = false
+    translatingLocale.value = null
   }
 }
 

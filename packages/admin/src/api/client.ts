@@ -27,8 +27,38 @@ export function initApiFetch(opts: {
 
 let refreshing: Promise<void> | null = null
 
+// ─── Query tracking (opt-in, set by DbMonitorPage) ───────────────────────────
+
+let _trackingEnabled = false
+
+export function setQueryTracking(enabled: boolean): void {
+  _trackingEnabled = enabled
+}
+
+function sendQueryLog(entry: {
+  url: string; method: string; durationMs: number; statusCode: number
+}): void {
+  const token = _getToken()
+  // Fire-and-forget, niente await — non deve rallentare le chiamate normali
+  fetch('/api/v1/plugins/db-monitor/query-log', {
+    method:      'POST',
+    credentials: 'include',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: JSON.stringify({
+      url:        entry.url,
+      method:     entry.method,
+      durationMs: entry.durationMs,
+      statusCode: entry.statusCode,
+    }),
+  }).catch(() => { /* silenzioso: il log è best-effort */ })
+}
+
 export async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<T> {
   const token = _getToken()
+  const t0    = _trackingEnabled ? performance.now() : 0
 
   const response = await fetch(path, {
     ...options,
@@ -62,6 +92,16 @@ export async function apiFetch<T>(path: string, options: RequestInit = {}): Prom
   if (!response.ok) {
     const body = await response.json().catch(() => ({}))
     throw new ApiError(response.status, body.error ?? 'Request failed', body.details)
+  }
+
+  // Traccia la durata se il tracking è attivo (escluse le chiamate di auth e del monitor stesso)
+  if (_trackingEnabled && t0 > 0 && !path.includes('/plugins/db-monitor/') && !path.includes('/auth/')) {
+    sendQueryLog({
+      url:        path,
+      method:     (options.method ?? 'GET').toUpperCase(),
+      durationMs: Math.round(performance.now() - t0),
+      statusCode: response.status,
+    })
   }
 
   // 204 No Content

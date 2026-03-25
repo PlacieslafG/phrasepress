@@ -40,11 +40,12 @@ export interface TranslationInput {
   status?:  string
 }
 
-export interface AutoTranslateAllResult {
-  locale:       string
-  ok:           boolean
-  translation?: Translation
-  error?:       string
+export interface TranslateAllJobStatus {
+  status:    'running' | 'done'
+  total:     number
+  completed: number
+  failed:    number
+  createdAt: number
 }
 
 // ─── API client ───────────────────────────────────────────────────────────────
@@ -99,10 +100,14 @@ export const i18nApi = {
     })
   },
 
-  autoTranslateAll(postId: number): Promise<AutoTranslateAllResult[]> {
-    return apiFetch<AutoTranslateAllResult[]>(`${BASE}/posts/${postId}/translate-all`, {
+  startTranslateAll(postId: number): Promise<{ jobId: string; total: number }> {
+    return apiFetch<{ jobId: string; total: number }>(`${BASE}/posts/${postId}/translate-all`, {
       method: 'POST',
     })
+  },
+
+  getTranslateAllJob(jobId: string): Promise<TranslateAllJobStatus> {
+    return apiFetch<TranslateAllJobStatus>(`${BASE}/jobs/${encodeURIComponent(jobId)}`)
   },
 
   // Settings
@@ -116,5 +121,9 @@ export const i18nApi = {
 
   testConnection(): Promise<{ message: string }> {
     return apiFetch<{ message: string }>(`${BASE}/settings/test`, { method: 'POST' })
+  },
+
+  pingServer(): Promise<{ message: string }> {
+    return apiFetch<{ message: string }>(`${BASE}/settings/ping`)
   },
 }

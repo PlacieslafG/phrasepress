@@ -134,6 +134,12 @@ const router = createRouter({
           component: () => import('@/pages/I18nSettingsPage.vue'),
           meta: { requireCapability: 'manage_plugins' },
         },
+        {
+          path: 'db-monitor',
+          name: 'db-monitor',
+          component: () => import('@/pages/DbMonitorPage.vue'),
+          meta: { requireCapability: 'manage_options' },
+        },
       ],
     },
     {

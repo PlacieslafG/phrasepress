@@ -8,6 +8,7 @@ export interface FieldDefinition {
   label?:       string
   queryable?:   boolean     // se true, scritto anche in post_field_index
   required?:    boolean
+  translatable?: boolean    // se false, non viene incluso nella traduzione automatica (default: true)
   options?:     string[]    // solo per type: 'select'
   fieldOptions?: Record<string, unknown>  // config per 'image' e 'relationship'
   default?:     unknown

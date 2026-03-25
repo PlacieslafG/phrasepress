@@ -29,6 +29,9 @@ const fieldsPlugin: Plugin = {
   },
 
   async register(ctx: PluginContext) {
+    // Esegue le migration schema ad ogni boot (idempotente: CREATE IF NOT EXISTS + ALTER TABLE con try/catch)
+    createTables(ctx.db)
+
     // Inject field group fields into post type definitions at request time
     ctx.hooks.addFilter('post_types.meta', (value: unknown) => {
       const types = value as PostTypeDefinition[]
@@ -43,6 +46,7 @@ const fieldsPlugin: Plugin = {
             type:         item.type as FieldDefinition['type'],
             required:     item.required === 1,
             queryable:    item.queryable === 1,
+            translatable: item.translatable === 1,
             options:      JSON.parse(item.options) as string[],
             fieldOptions: JSON.parse(item.fieldOptions) as Record<string, unknown>,
             default:      item.defaultValue != null ? JSON.parse(item.defaultValue) : undefined,

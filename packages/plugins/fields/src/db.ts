@@ -24,6 +24,7 @@ export const ppFieldItems = sqliteTable('pp_field_items', {
   type:         text('type').notNull(),
   required:     integer('required').notNull().default(0),
   queryable:    integer('queryable').notNull().default(0),
+  translatable: integer('translatable').notNull().default(1),
   options:      text('options').notNull().default('[]'),        // JSON string[] for 'select'
   fieldOptions: text('field_options').notNull().default('{}'),  // JSON config for 'image'/'relationship'
   defaultValue: text('default_value'),                          // JSON-encoded or null
@@ -54,12 +55,19 @@ export function createTables(db: Db): void {
       type          TEXT NOT NULL,
       required      INTEGER NOT NULL DEFAULT 0,
       queryable     INTEGER NOT NULL DEFAULT 0,
+      translatable  INTEGER NOT NULL DEFAULT 1,
       options       TEXT NOT NULL DEFAULT '[]',
       field_options TEXT NOT NULL DEFAULT '{}',
       default_value TEXT,
       sort_order    INTEGER NOT NULL DEFAULT 0
     );
   `)
+  // Migration: aggiunge translatable se la tabella esiste già senza di esso
+  try {
+    client.exec(`ALTER TABLE pp_field_items ADD COLUMN translatable INTEGER NOT NULL DEFAULT 1`)
+  } catch {
+    // Column already exists — ignore
+  }
 }
 
 // ─── Group helpers ────────────────────────────────────────────────────────────
@@ -115,6 +123,7 @@ export interface FieldItemInput {
   type:          string
   required?:     boolean
   queryable?:    boolean
+  translatable?: boolean
   options?:      string[]
   fieldOptions?: Record<string, unknown>
   defaultValue?: unknown
@@ -130,6 +139,7 @@ export function dbCreateItem(db: Db, groupId: string, data: FieldItemInput): Fie
     type:         data.type,
     required:     data.required ? 1 : 0,
     queryable:    data.queryable ? 1 : 0,
+    translatable: data.translatable === false ? 0 : 1,
     options:      JSON.stringify(data.options ?? []),
     fieldOptions: JSON.stringify(data.fieldOptions ?? {}),
     defaultValue: data.defaultValue != null ? JSON.stringify(data.defaultValue) : null,
@@ -145,6 +155,7 @@ export function dbUpdateItem(db: Db, id: string, data: FieldItemInput): FieldIte
     type:         data.type,
     required:     data.required ? 1 : 0,
     queryable:    data.queryable ? 1 : 0,
+    translatable: data.translatable === false ? 0 : 1,
     options:      JSON.stringify(data.options ?? []),
     fieldOptions: JSON.stringify(data.fieldOptions ?? {}),
     defaultValue: data.defaultValue != null ? JSON.stringify(data.defaultValue) : null,

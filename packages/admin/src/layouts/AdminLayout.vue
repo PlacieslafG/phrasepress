@@ -156,6 +156,18 @@
               </a>
             </RouterLink>
 
+            <RouterLink
+              v-if="appStore.isPluginActive('phrasepress-db-monitor')"
+              to="/db-monitor"
+              v-slot="{ navigate, isActive }"
+              custom
+            >
+              <a @click="navigate" :class="navClass(isActive)">
+                <i class="pi pi-database text-sm shrink-0" />
+                <span>DB Monitor</span>
+              </a>
+            </RouterLink>
+
             <RouterLink to="/api-tester" v-slot="{ navigate, isActive }" custom>
               <a @click="navigate" :class="navClass(isActive)">
                 <i class="pi pi-code text-sm shrink-0" />

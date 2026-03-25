@@ -99,7 +99,25 @@
     </div>
 
     <!-- ── Body ── -->
-    <div class="flex flex-1 overflow-hidden">
+    <div class="relative flex flex-1 overflow-hidden">
+
+      <!-- ── Translation-in-progress overlay ── -->
+      <Transition name="fade">
+        <div
+          v-if="jobStore.activeJob?.postId === postId"
+          class="absolute inset-0 z-20 flex flex-col items-center justify-center gap-4 bg-surface-900/70 backdrop-blur-sm"
+        >
+          <i class="pi pi-spinner pi-spin text-4xl text-primary-400" />
+          <p class="text-lg font-semibold text-white">Traduzione in corso…</p>
+          <p class="text-sm text-surface-300">
+            {{ jobStore.activeJob.completed }} / {{ jobStore.activeJob.total }} lingue completate
+            <template v-if="jobStore.activeJob.failed > 0">
+              &nbsp;· {{ jobStore.activeJob.failed }} fallite
+            </template>
+          </p>
+          <p class="text-xs text-surface-400">Puoi navigare liberamente, la traduzione continua in background</p>
+        </div>
+      </Transition>
 
       <!-- ── Original tab ── -->
       <template v-if="activeLocale === null">
@@ -168,7 +186,8 @@
             v-if="currentLocale"
             :key="activeLocale"
             v-model="translationForm"
-            :translatable-field-defs="translatableFieldDefs"
+            :all-field-defs="fieldDefs"
+            :original-fields="form.fields"
           />
         </div>
       </div>
@@ -178,7 +197,8 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, watchEffect, onMounted } from 'vue'
+import { ref, computed, watch, watchEffect, onMounted, onUnmounted } from 'vue'
+import { useI18nJobsStore } from '@/stores/i18nJobs.js'
 import { useRoute, useRouter } from 'vue-router'
 import { useAppStore } from '@/stores/app.js'
 import { postsApi } from '@/api/posts.js'
@@ -194,9 +214,10 @@ import TaxonomySelector  from '@/components/TaxonomySelector.vue'
 import RevisionsPanel    from '@/components/RevisionsPanel.vue'
 import TranslationEditor from '@/components/TranslationEditor.vue'
 
-const route   = useRoute()
-const router  = useRouter()
-const appStore = useAppStore()
+const route    = useRoute()
+const router   = useRouter()
+const appStore  = useAppStore()
+const jobStore  = useI18nJobsStore()
 const toast   = useToast()
 const confirm = useConfirm()
 
@@ -302,6 +323,16 @@ async function onRestored() {
 onMounted(async () => {
   await loadPost()
   await loadI18n()
+  // Riprende il polling se c'era un job attivo per questo post al momento del reload/navigazione
+  const saved = jobStore.activeJob
+  if (saved && saved.postId === postId.value) {
+    translatingAll.value = true
+    startPolling(saved.jobId)
+  }
+})
+
+onUnmounted(() => {
+  if (_translateAllPollTimer) clearInterval(_translateAllPollTimer)
 })
 
 // Se l'utente naviga a un altro post type senza uscire dalla pagina
@@ -331,15 +362,40 @@ const translatingAll   = ref(false)
 const savingTranslation = ref(false)
 const translatingCurrent = ref(false)
 
+let _translateAllPollTimer: ReturnType<typeof setInterval> | null = null
+
+function startPolling(jobId: string) {
+  if (_translateAllPollTimer) clearInterval(_translateAllPollTimer)
+  _translateAllPollTimer = setInterval(async () => {
+    try {
+      const job = await i18nApi.getTranslateAllJob(jobId)
+      jobStore.updateProgress(job.completed, job.failed)
+      if (job.status === 'done') {
+        clearInterval(_translateAllPollTimer!)
+        _translateAllPollTimer = null
+        jobStore.clearJob()
+        translatingAll.value = false
+        if (postId.value) {
+          translations.value = await i18nApi.listTranslations(postId.value)
+        }
+        if (job.failed === 0) {
+          toast.add({ severity: 'success', summary: 'Traduzione completata', detail: `${job.completed} lingue tradotte`, life: 4000 })
+        } else {
+          toast.add({ severity: 'warn', summary: 'Traduzione parziale', detail: `${job.completed} su ${job.total} riuscite`, life: 5000 })
+        }
+      }
+    } catch {
+      clearInterval(_translateAllPollTimer!)
+      _translateAllPollTimer = null
+      jobStore.clearJob()
+      translatingAll.value = false
+    }
+  }, 3_000)
+}
+
 const translationForm = ref<TranslationForm>({
   title: '', slug: '', content: '', fields: {}, status: 'draft',
 })
-
-const TRANSLATABLE_TYPES = new Set(['string', 'textarea', 'richtext'])
-
-const translatableFieldDefs = computed(() =>
-  fieldDefs.value.filter(f => TRANSLATABLE_TYPES.has(f.type))
-)
 
 const showI18nTabs = computed(() =>
   !isNew.value && appStore.isPluginActive('phrasepress-i18n') && locales.value.length > 0
@@ -373,7 +429,7 @@ function switchLocale(code: string) {
   const t = getTranslation(code)
   translationForm.value = t
     ? { title: t.title, slug: t.slug, content: t.content, fields: { ...t.fields }, status: t.status }
-    : { title: form.value.title, slug: '', content: '', fields: {}, status: 'draft' }
+    : { title: form.value.title, slug: '', content: '', fields: { ...form.value.fields }, status: 'draft' }
 }
 
 // Safety net: keep translationForm in sync whenever activeLocale or translations change
@@ -453,30 +509,16 @@ async function autoTranslateCurrent() {
 
 async function translateAll() {
   if (!postId.value || locales.value.length === 0) return
-  translatingAll.value = true
-  // Show spinners on all non-default locales
+  translatingAll.value    = true
+  translatingLocale.value = null
   try {
-    const results = await i18nApi.autoTranslateAll(postId.value)
-    let successes = 0
-    for (const r of results) {
-      translatingLocale.value = r.locale
-      if (r.ok && r.translation) {
-        onTranslationSaved(r.translation)
-        successes++
-      }
-    }
-    const total = results.length
-    if (successes === total) {
-      toast.add({ severity: 'success', summary: 'Traduzione completata', detail: `${total} lingue tradotte`, life: 3000 })
-    } else {
-      toast.add({ severity: 'warn', summary: 'Traduzione parziale', detail: `${successes} su ${total} riuscite`, life: 4000 })
-    }
+    const { jobId, total } = await i18nApi.startTranslateAll(postId.value)
+    jobStore.startJob(jobId, postId.value, total)
+    startPolling(jobId)
   } catch (err: unknown) {
-    const msg = (err as { message?: string })?.message ?? 'Errore'
+    translatingAll.value = false
+    const msg = (err as { message?: string })?.message ?? 'Errore avvio traduzione'
     toast.add({ severity: 'error', summary: 'Traduzione fallita', detail: msg, life: 4000 })
-  } finally {
-    translatingAll.value    = false
-    translatingLocale.value = null
   }
 }
 
@@ -504,3 +546,10 @@ function confirmDeleteTranslation() {
   })
 }
 </script>
+
+<style scoped>
+.fade-enter-active,
+.fade-leave-active { transition: opacity 0.25s ease; }
+.fade-enter-from,
+.fade-leave-to    { opacity: 0; }
+</style>

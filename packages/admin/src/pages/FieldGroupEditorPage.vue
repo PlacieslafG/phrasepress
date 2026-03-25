@@ -68,6 +68,11 @@
               <i :class="data.queryable ? 'pi pi-check text-green-500' : 'pi pi-minus text-surface-300'" />
             </template>
           </Column>
+          <Column field="translatable" header="Traduci" style="width:70px">
+            <template #body="{ data }">
+              <i :class="data.translatable !== false ? 'pi pi-language text-primary-500' : 'pi pi-minus text-surface-300'" />
+            </template>
+          </Column>
           <Column style="width:90px">
             <template #body="{ data }">
               <div class="flex gap-1">
@@ -176,6 +181,10 @@
             <ToggleSwitch v-model="fieldForm.queryable" input-id="fQueryable" />
             <label for="fQueryable" class="text-sm">Indicizzabile</label>
           </div>
+          <div class="flex items-center gap-2">
+            <ToggleSwitch v-model="fieldForm.translatable" input-id="fTranslatable" />
+            <label for="fTranslatable" class="text-sm">Traduci automaticamente</label>
+          </div>
         </div>
       </div>
 
@@ -232,8 +241,8 @@ const postTypeOptions = computed(() => appStore.postTypes)
 
 const fieldDialogVisible = ref(false)
 const editingField       = ref<FieldItem | null>(null)
-const fieldForm          = ref<FieldItemInput & { required: boolean; queryable: boolean }>({
-  name: '', label: '', type: 'string', required: false, queryable: false,
+const fieldForm = ref<FieldItemInput & { required: boolean; queryable: boolean; translatable: boolean }>({
+  name: '', label: '', type: 'string', required: false, queryable: false, translatable: true,
 })
 const selectOptionsText = ref('')
 const relPostType       = ref('')
@@ -263,18 +272,19 @@ function openFieldDialog(item?: FieldItem) {
   editingField.value = item ?? null
   if (item) {
     fieldForm.value = {
-      name:     item.name,
-      label:    item.label,
-      type:     item.type,
-      required: item.required,
-      queryable: item.queryable,
+      name:         item.name,
+      label:        item.label,
+      type:         item.type,
+      required:     item.required,
+      queryable:    item.queryable,
+      translatable: item.translatable !== false,
     }
     selectOptionsText.value = item.options?.join('\n') ?? ''
     relPostType.value       = (item.fieldOptions?.postType as string) ?? ''
     relMultiple.value       = (item.fieldOptions?.multiple as boolean) ?? false
     subFields.value         = (item.fieldOptions?.subFields as { name: string; label: string; type: string }[]) ?? []
   } else {
-    fieldForm.value = { name: '', label: '', type: 'string', required: false, queryable: false }
+    fieldForm.value = { name: '', label: '', type: 'string', required: false, queryable: false, translatable: true }
     selectOptionsText.value = ''
     relPostType.value       = ''
     relMultiple.value       = false
@@ -297,11 +307,12 @@ async function saveField() {
   }
 
   const payload: FieldItemInput = {
-    name:     fieldForm.value.name.trim().replace(/\s+/g, '_'),
-    label:    fieldForm.value.label,
-    type:     fieldForm.value.type,
-    required: fieldForm.value.required,
-    queryable: fieldForm.value.queryable,
+    name:         fieldForm.value.name.trim().replace(/\s+/g, '_'),
+    label:        fieldForm.value.label,
+    type:         fieldForm.value.type,
+    required:     fieldForm.value.required,
+    queryable:    fieldForm.value.queryable,
+    translatable: fieldForm.value.translatable,
   }
 
   if (fieldForm.value.type === 'select') {
@@ -329,6 +340,7 @@ async function saveField() {
           type:         payload.type ?? 'string',
           required:     payload.required ?? false,
           queryable:    payload.queryable ?? false,
+          translatable: payload.translatable !== false,
           options:      payload.options ?? [],
           fieldOptions: payload.fieldOptions ?? {},
           defaultValue: null,

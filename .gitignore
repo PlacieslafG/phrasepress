@@ -27,4 +27,13 @@ Thumbs.db
 *.swp
 
 # drizzle migrations intermedie
+
+# build artifact nei plugin (compilati da tsc, non sorgenti)
+packages/plugins/*/src/*.js
+packages/plugins/*/src/*.js.map
+packages/plugins/*/src/*.d.ts
+packages/plugins/*/src/*.d.ts.map
+
+# sito di test locale
+test-sito/
 packages/core/src/db/migrations/meta/

@@ -8,6 +8,7 @@ export interface FieldItem {
   type:         string
   required:     boolean
   queryable:    boolean
+  translatable: boolean
   options:      string[]
   fieldOptions: Record<string, unknown>
   defaultValue: unknown
@@ -36,6 +37,7 @@ export interface FieldItemInput {
   type:          string
   required?:     boolean
   queryable?:    boolean
+  translatable?: boolean
   options?:      string[]
   fieldOptions?: Record<string, unknown>
   defaultValue?: unknown

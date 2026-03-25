@@ -53,6 +53,11 @@
       <button :class="tbBtn(false)" @click="mediaPickerVisible = true">
         <i class="pi pi-image" />
       </button>
+
+      <!-- Indicatore upload in corso -->
+      <span v-if="uploading" class="flex items-center gap-1 px-2 text-xs text-primary-500">
+        <i class="pi pi-spin pi-spinner text-[11px]" /> Caricamento…
+      </span>
     </div>
 
     <!-- Editor area -->
@@ -69,11 +74,13 @@ import StarterKit from '@tiptap/starter-kit'
 import Link from '@tiptap/extension-link'
 import Image from '@tiptap/extension-image'
 import MediaPickerDialog from './MediaPickerDialog.vue'
+import { apiFetch } from '@/api/client.js'
 
 const props = defineProps<{ modelValue: string }>()
 const emit  = defineEmits<{ 'update:modelValue': [value: string] }>()
 
 const mediaPickerVisible = ref(false)
+const uploading = ref(false)
 
 function tbBtn(active: boolean | undefined) {
   return [
@@ -89,13 +96,67 @@ function insertImage(url: string, alt: string) {
   editor.value?.chain().focus().setImage({ src: url, alt }).run()
 }
 
+// Carica un file immagine sul media server; se l'upload fallisce, inserisce come base64
+async function uploadFile(file: File): Promise<void> {
+  uploading.value = true
+  try {
+    const form = new FormData()
+    form.append('file', file)
+    const res = await apiFetch<{ filename: string }>('/api/v1/plugins/media/upload', {
+      method: 'POST',
+      body: form,
+    })
+    insertImage(`/api/v1/plugins/media/files/${res.filename}`, file.name.replace(/\.[^.]+$/, ''))
+  } catch {
+    // Fallback base64: se il media plugin non è attivo o upload fallisce
+    const reader = new FileReader()
+    reader.onload = (e) => {
+      const src = e.target?.result as string
+      if (src) insertImage(src, file.name)
+    }
+    reader.readAsDataURL(file)
+  } finally {
+    uploading.value = false
+  }
+}
+
 const editor = useEditor({
   content: props.modelValue,
   extensions: [
     StarterKit,
     Link.configure({ openOnClick: false }),
-    Image.configure({ inline: false, allowBase64: false }),
+    // allowBase64: true per caricare correttamente le immagini base64 già esistenti
+    Image.configure({ inline: false, allowBase64: true }),
   ],
+  editorProps: {
+    handlePaste(_view, event) {
+      const items = event.clipboardData?.items
+      if (!items) return false
+      for (const item of Array.from(items)) {
+        if (item.type.startsWith('image/')) {
+          const file = item.getAsFile()
+          if (!file) continue
+          event.preventDefault()
+          void uploadFile(file)
+          return true
+        }
+      }
+      return false
+    },
+    handleDrop(_view, event, _slice, moved) {
+      if (moved) return false
+      const files = event.dataTransfer?.files
+      if (!files) return false
+      for (const file of Array.from(files)) {
+        if (file.type.startsWith('image/')) {
+          event.preventDefault()
+          void uploadFile(file)
+          return true
+        }
+      }
+      return false
+    },
+  },
   onUpdate({ editor: e }) {
     emit('update:modelValue', e.getHTML())
   },
