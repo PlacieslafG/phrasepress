@@ -1,0 +1,24 @@
+{
+  "name": "@phrasepress/plugin-backup",
+  "version": "1.0.0",
+  "description": "Backup and restore plugin for PhrasePress",
+  "type": "module",
+  "main": "./src/index.ts",
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@phrasepress/core": "workspace:*",
+    "@aws-sdk/client-s3": "^3.758.0",
+    "archiver": "^7.0.1",
+    "unzipper": "^0.12.3"
+  },
+  "devDependencies": {
+    "@types/archiver": "^6.0.3",
+    "@types/unzipper": "^0.10.10",
+    "@types/node": "^22.0.0",
+    "drizzle-orm": "^0.40.1",
+    "fastify": "^5.2.1",
+    "typescript": "^5.7.3"
+  }
+}

@@ -107,5 +107,6 @@ export default defineConfig({
     // forms e mailer non servono in una KB interna
     // db-monitor utile in sviluppo
     (await import('../packages/plugins/db-monitor/src/index.js')).default,
+    (await import('../packages/plugins/backup/src/index.js')).default,
   ],
 })

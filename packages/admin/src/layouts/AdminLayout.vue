@@ -168,6 +168,18 @@
               </a>
             </RouterLink>
 
+            <RouterLink
+              v-if="appStore.isPluginActive('phrasepress-backup')"
+              to="/backup"
+              v-slot="{ navigate, isActive }"
+              custom
+            >
+              <a @click="navigate" :class="navClass(isActive)">
+                <i class="pi pi-box text-sm shrink-0" />
+                <span>Backup</span>
+              </a>
+            </RouterLink>
+
             <RouterLink to="/api-tester" v-slot="{ navigate, isActive }" custom>
               <a @click="navigate" :class="navClass(isActive)">
                 <i class="pi pi-code text-sm shrink-0" />

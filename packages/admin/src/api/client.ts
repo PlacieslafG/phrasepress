@@ -109,3 +109,34 @@ export async function apiFetch<T>(path: string, options: RequestInit = {}): Prom
 
   return response.json() as Promise<T>
 }
+
+// Authenticated fetch that returns a Blob (for file downloads)
+export async function apiFetchBlob(path: string): Promise<Blob> {
+  const token = _getToken()
+
+  const response = await fetch(path, {
+    credentials: 'include',
+    headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+  })
+
+  if (response.status === 401) {
+    if (!refreshing) {
+      refreshing = _doRefresh().finally(() => { refreshing = null })
+    }
+    try {
+      await refreshing
+    } catch {
+      _clearSession()
+      window.location.href = '/login'
+      throw new ApiError(401, 'Session expired')
+    }
+    return apiFetchBlob(path)
+  }
+
+  if (!response.ok) {
+    const body = await response.json().catch(() => ({}))
+    throw new ApiError(response.status, body.error ?? 'Request failed')
+  }
+
+  return response.blob()
+}

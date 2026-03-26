@@ -79,6 +79,31 @@ authStore.hasCapability('manage_users')  // true se è administrator o ha la cap
 - Per i toast: sempre usare `useToast()` — non alert/confirm browser.
 - Per le conferme distruttive (elimina, ripristina): sempre `useConfirm()` con dialog.
 
+## Toast e ConfirmDialog — regola fondamentale
+
+**`<Toast>` e `<ConfirmDialog>` sono montati UNA SOLA VOLTA in `App.vue`** a livello globale.
+Non aggiungerli mai nei componenti pagina o nei plugin.
+
+```vue
+<!-- ✅ CORRETTO: solo in App.vue -->
+<Toast position="top-right" />
+<ConfirmDialog />
+
+<!-- ❌ SBAGLIATO: nei componenti pagina (BackupPage, UsersPage, ecc.) -->
+<Toast />        <!-- duplica il layer, causa toast doppi -->
+<ConfirmDialog /> <!-- duplica il dialog, causa comportamenti erratici -->
+```
+
+Nei componenti si usano **solo i composable** (funzionano grazie all'istanza globale):
+
+```ts
+import { useToast }   from 'primevue/usetoast'
+import { useConfirm } from 'primevue/useconfirm'
+
+const toast   = useToast()   // ✅ ok ovunque
+const confirm = useConfirm() // ✅ ok ovunque
+```
+
 ## TailwindCSS
 
 - Usare Tailwind per layout, spacing, colori custom.

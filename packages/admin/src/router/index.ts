@@ -140,6 +140,12 @@ const router = createRouter({
           component: () => import('@/pages/DbMonitorPage.vue'),
           meta: { requireCapability: 'manage_options' },
         },
+        {
+          path: 'backup',
+          name: 'backup',
+          component: () => import('@/pages/BackupPage.vue'),
+          meta: { requireCapability: 'manage_options' },
+        },
       ],
     },
     {
