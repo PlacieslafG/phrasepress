@@ -86,7 +86,6 @@
     </div>
   </div>
 
-  <ConfirmDialog />
 </template>
 
 <script setup lang="ts">

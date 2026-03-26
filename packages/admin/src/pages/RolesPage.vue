@@ -186,7 +186,6 @@
     </template>
   </Dialog>
 
-  <ConfirmDialog />
   <Toast />
 </template>
 

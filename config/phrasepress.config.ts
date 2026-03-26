@@ -2,20 +2,19 @@ import { defineConfig } from '../packages/core/src/config.js'
 
 export default defineConfig({
   postTypes: [
-    // Esempio custom post type:
+    // Uncomment to add a custom post type:
     // {
     //   name: 'product',
     //   label: 'Products',
     //   icon: 'pi-box',
     //   fields: [
     //     { name: 'price', type: 'number', label: 'Price', queryable: true },
-    //     { name: 'sku',   type: 'string', label: 'SKU',   queryable: true },
     //   ],
     // },
   ],
 
   taxonomies: [
-    // Esempio custom taxonomy:
+    // Uncomment to add a custom taxonomy:
     // {
     //   slug: 'genre',
     //   name: 'Genres',

@@ -2,35 +2,8 @@
   <div class="p-6 flex flex-col gap-6">
     <div class="flex items-center justify-between">
       <h2 class="text-2xl font-semibold">DB Monitor</h2>
-      <div class="flex items-center gap-2">
-        <!-- Live interval selector (visible only when live is on) -->
-        <Select
-          v-if="liveEnabled"
-          v-model="liveInterval"
-          :options="INTERVAL_OPTIONS"
-          option-label="label"
-          option-value="value"
-          size="small"
-          class="w-32"
-          @change="restartLive"
-        />
-        <!-- Live toggle -->
-        <button
-          class="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium border transition-colors select-none"
-          :class="liveEnabled
-            ? 'bg-green-500/10 border-green-500/40 text-green-600 dark:text-green-400 hover:bg-green-500/20'
-            : 'bg-surface-0 dark:bg-surface-900 border-surface-200 dark:border-surface-700 text-surface-500 hover:bg-surface-50 dark:hover:bg-surface-800'"
-          @click="toggleLive"
-        >
-          <span
-            class="inline-block w-2 h-2 rounded-full"
-            :class="liveEnabled ? 'bg-green-500 animate-pulse' : 'bg-surface-400'"
-          />
-          {{ liveEnabled ? 'Live ON' : 'Live' }}
-        </button>
-        <!-- Manual refresh -->
-        <Button icon="pi pi-refresh" severity="secondary" size="small" :loading="refreshing" @click="refresh" v-tooltip.bottom="'Aggiorna ora'" />
-      </div>
+      <!-- Manual refresh -->
+      <Button icon="pi pi-refresh" severity="secondary" size="small" :loading="refreshing" @click="refresh" v-tooltip.bottom="'Aggiorna ora'" />
     </div>
 
     <!-- ─── Tab navigation ──────────────────────────────────────────────────── -->
@@ -235,6 +208,33 @@
 
     <!-- ─── Tab: Query Log ───────────────────────────────────────────────────── -->
     <div v-if="activeTab === 'queries'">
+      <!-- Live controls -->
+      <div class="flex items-center justify-end gap-2 mb-4">
+        <Select
+          v-if="liveEnabled"
+          v-model="liveInterval"
+          :options="INTERVAL_OPTIONS"
+          option-label="label"
+          option-value="value"
+          size="small"
+          class="w-36"
+          @change="restartLive"
+        />
+        <button
+          class="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium border transition-colors select-none"
+          :class="liveEnabled
+            ? 'bg-green-500/10 border-green-500/40 text-green-600 dark:text-green-400 hover:bg-green-500/20'
+            : 'bg-surface-0 dark:bg-surface-900 border-surface-200 dark:border-surface-700 text-surface-500 hover:bg-surface-50 dark:hover:bg-surface-800'"
+          @click="toggleLive"
+        >
+          <span
+            class="inline-block w-2 h-2 rounded-full"
+            :class="liveEnabled ? 'bg-green-500 animate-pulse' : 'bg-surface-400'"
+          />
+          {{ liveEnabled ? 'Live ON' : 'Live' }}
+        </button>
+      </div>
+
       <div v-if="loadingLog" class="text-surface-400 text-sm">Caricamento...</div>
 
       <div v-else-if="queryLog" class="flex flex-col gap-6">
@@ -319,7 +319,7 @@
 
           <!-- Query log table -->
           <div class="bg-surface-0 dark:bg-surface-900 border border-surface-200 dark:border-surface-700 rounded-xl overflow-hidden">
-            <DataTable :value="queryLog.data" class="text-sm">
+            <DataTable :value="queryLog.data" :row-class="queryRowClass" class="text-sm">
               <Column header="Metodo" style="width: 90px">
                 <template #body="{ data }">
                   <Tag
@@ -392,12 +392,11 @@
     </div>
   </div>
 
-  <ConfirmDialog />
   <Toast />
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue'
 import { useToast } from 'primevue/usetoast'
 import { useConfirm } from 'primevue/useconfirm'
 import {
@@ -438,6 +437,8 @@ const expandedTables = ref(new Set<string>())
 
 // Live refresh
 const INTERVAL_OPTIONS = [
+  { label: '500 ms', value: 500 },
+  { label: '1 sec',  value: 1000 },
   { label: '2 sec',  value: 2000 },
   { label: '5 sec',  value: 5000 },
   { label: '10 sec', value: 10000 },
@@ -461,6 +462,8 @@ const loadingLog   = ref(false)
 const logPage      = ref(1)
 const logLimit     = 50
 const logSort      = ref<QueryLogSort>('newest')
+const newEntryIds  = ref(new Set<number>())
+let   prevEntryIds = new Set<number>()
 
 // ─── Computed ─────────────────────────────────────────────────────────────────
 
@@ -528,6 +531,10 @@ function statusSeverity(code: number): 'success' | 'warn' | 'danger' | 'secondar
   return 'secondary'
 }
 
+function queryRowClass(row: { id: number }): string {
+  return newEntryIds.value.has(row.id) ? 'query-row-new' : ''
+}
+
 // ─── Data loading ─────────────────────────────────────────────────────────────
 
 async function loadIndexes(): Promise<void> {
@@ -556,16 +563,35 @@ async function loadStats(): Promise<void> {
   }
 }
 
-async function loadQueryLog(): Promise<void> {
-  loadingLog.value = true
+async function loadQueryLog(silent = false): Promise<void> {
+  if (!silent) loadingLog.value = true
   try {
-    queryLog.value = await getQueryLog({ page: logPage.value, limit: logLimit, sort: logSort.value })
+    const result = await getQueryLog({ page: logPage.value, limit: logLimit, sort: logSort.value })
+    newEntryIds.value = new Set()
+    prevEntryIds = new Set(result.data.map(e => e.id))
+    queryLog.value = result
   } catch (err) {
     if (err instanceof ApiError) {
       toast.add({ severity: 'error', summary: 'Errore', detail: err.message, life: 4000 })
     }
   } finally {
-    loadingLog.value = false
+    if (!silent) loadingLog.value = false
+  }
+}
+
+async function loadQueryLogLive(): Promise<void> {
+  try {
+    const result = await getQueryLog({ page: logPage.value, limit: logLimit, sort: logSort.value })
+    if (prevEntryIds.size > 0) {
+      const fresh = new Set(result.data.filter(e => !prevEntryIds.has(e.id)).map(e => e.id))
+      if (fresh.size > 0) {
+        newEntryIds.value = fresh
+      }
+    }
+    prevEntryIds = new Set(result.data.map(e => e.id))
+    queryLog.value = result
+  } catch {
+    // errori silenziosi durante il live refresh
   }
 }
 
@@ -576,7 +602,7 @@ async function refresh(): Promise<void> {
 }
 
 function startLive(): void {
-  liveTimer = setInterval(refresh, liveInterval.value)
+  liveTimer = setInterval(loadQueryLogLive, liveInterval.value)
 }
 
 function stopLive(): void {
@@ -603,6 +629,9 @@ function restartLive(): void {
 }
 
 function confirmClear(): void {
+  const wasLive = liveEnabled.value
+  if (wasLive) stopLive()
+
   confirm.require({
     message: 'Eliminare tutte le query registrate nel log?',
     header:  'Svuota query log',
@@ -613,13 +642,19 @@ function confirmClear(): void {
     accept: async () => {
       try {
         const result = await clearQueryLog()
+        await nextTick()
         toast.add({ severity: 'success', summary: 'Log svuotato', detail: `${result.deleted} entry eliminate`, life: 3000 })
-        await loadQueryLog()
+        await loadQueryLog(true)
       } catch (err) {
         if (err instanceof ApiError) {
           toast.add({ severity: 'error', summary: 'Errore', detail: err.message, life: 4000 })
         }
+      } finally {
+        if (wasLive) startLive()
       }
+    },
+    reject: () => {
+      if (wasLive) startLive()
     },
   })
 }
@@ -638,3 +673,12 @@ onUnmounted(() => {
   stopLive()
 })
 </script>
+
+<style scoped>
+:deep(.query-row-new) {
+  border-left: 3px solid rgb(34 197 94);
+}
+:deep(.query-row-new td) {
+  background-color: rgb(34 197 94 / 0.07) !important;
+}
+</style>

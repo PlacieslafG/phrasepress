@@ -140,7 +140,6 @@
       </template>
     </Dialog>
 
-    <ConfirmDialog />
     <Toast />
   </div>
 </template>

@@ -65,7 +65,6 @@
     </template>
   </Dialog>
 
-  <ConfirmDialog />
 </template>
 
 <script setup lang="ts">

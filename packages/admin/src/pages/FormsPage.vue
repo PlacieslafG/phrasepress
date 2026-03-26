@@ -69,7 +69,6 @@
       </Column>
     </DataTable>
 
-    <ConfirmDialog />
     <Toast />
   </div>
 </template>

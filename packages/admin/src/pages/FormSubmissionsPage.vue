@@ -80,7 +80,6 @@
       />
     </div>
 
-    <ConfirmDialog />
     <Toast />
   </div>
 </template>
