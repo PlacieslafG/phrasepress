@@ -4,6 +4,7 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
+    "wizard": "node --import tsx/esm scripts/wizard.ts",
     "dev": "pnpm --filter @phrasepress/core dev",
     "dev:admin": "pnpm --filter @phrasepress/admin dev",
     "build": "pnpm --filter @phrasepress/core build && pnpm --filter @phrasepress/admin build",
@@ -12,6 +13,7 @@
     "typecheck": "pnpm -r typecheck"
   },
   "devDependencies": {
+    "tsx": "^4.19.3",
     "typescript": "^5.7.3"
   },
   "pnpm": {

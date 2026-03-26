@@ -36,4 +36,4 @@ packages/plugins/*/src/*.d.ts.map
 
 # sito di test locale
 test-sito/
-packages/core/src/db/migrations/meta/
+packages/core/src/db/migrations/meta/.env.backup
