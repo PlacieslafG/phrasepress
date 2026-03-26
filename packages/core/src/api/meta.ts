@@ -1,58 +1,61 @@
 import type { FastifyPluginAsync } from 'fastify'
 import { db } from '../db/client.js'
-import { posts } from '../db/schema.js'
+import { folios } from '../db/schema.js'
 import { sql } from 'drizzle-orm'
-import type { PostTypeRegistry } from '../post-types/registry.js'
-import type { HookManager } from '../hooks/HookManager.js'
+import type { CodexRegistry } from '../codices/registry.js'
+import type { IHookManager } from '../hooks/HookManager.js'
 import '../types.js'
 
 interface MetaPluginOptions {
-  postTypeRegistry: PostTypeRegistry
-  hooks: HookManager
+  codexRegistry: CodexRegistry
+  hooks: IHookManager
 }
 
 const metaRoutes: FastifyPluginAsync<MetaPluginOptions> = async (fastify, opts) => {
-  const { postTypeRegistry, hooks } = opts
+  const { codexRegistry, hooks } = opts
 
-  // ── GET /post-types ─────────────────────────────────────────────────────────
-  fastify.get('/post-types', {
-    preHandler: [fastify.authenticate],
-  }, async () => {
-    const types = postTypeRegistry.getAll()
-    return hooks.applyFilters('post_types.meta', types)
+  // ── GET /health ──────────────────────────────────────────────────────────────
+  // Unauthenticated — usato dall'admin UI per polling post-riavvio
+  fastify.get('/health', async () => {
+    return { ok: true, timestamp: Date.now() }
   })
 
-  // ── GET /stats ──────────────────────────────────────────────────────────────
+  // ── GET /codices ─────────────────────────────────────────────────────────────
+  fastify.get('/codices', {
+    preHandler: [fastify.authenticate],
+  }, async () => {
+    const types = codexRegistry.getAll()
+    return hooks.applyFilters('codices.meta', types)
+  })
+
+  // ── GET /stats ───────────────────────────────────────────────────────────────
   fastify.get('/stats', {
     preHandler: [fastify.authenticate],
   }, async () => {
-    const postTypes = postTypeRegistry.getAll().map((pt) => pt.name)
-    const statuses  = ['published', 'draft', 'trash'] as const
+    const codexNames = codexRegistry.getAll().map((c) => c.name)
 
     const counts = db
       .select({
-        postType: posts.postType,
-        status:   posts.status,
-        total:    sql<number>`COUNT(*)`.as('total'),
+        codex: folios.codex,
+        stage: folios.stage,
+        total: sql<number>`COUNT(*)`.as('total'),
       })
-      .from(posts)
-      .groupBy(posts.postType, posts.status)
+      .from(folios)
+      .groupBy(folios.codex, folios.stage)
       .all()
 
-    // Trasforma in { [postType]: { publish: N, draft: N, trash: N, total: N } }
+    // Trasforma in { [codex]: { published: N, draft: N, trash: N, total: N } }
     const result: Record<string, Record<string, number>> = {}
 
-    for (const pt of postTypes) {
-      result[pt] = { published: 0, draft: 0, trash: 0, total: 0 }
+    for (const name of codexNames) {
+      result[name] = { published: 0, draft: 0, trash: 0, total: 0 }
     }
 
     for (const row of counts) {
-      const pt = row.postType
-      if (!result[pt]) continue
-      if (statuses.includes(row.status as typeof statuses[number])) {
-        result[pt][row.status] = row.total
-      }
-      result[pt]['total'] += row.total
+      const name = row.codex
+      if (!result[name]) continue
+      result[name][row.stage] = (result[name][row.stage] ?? 0) + row.total
+      result[name]['total'] += row.total
     }
 
     return result

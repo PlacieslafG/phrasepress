@@ -1,9 +1,426 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "91cda102-fb9e-4ecb-b030-942b9a603335",
+  "id": "72637234-1de7-4ba3-8e8a-5692ea7eeb97",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "tables": {
+    "folio_field_index": {
+      "name": "folio_field_index",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": true
+        },
+        "folio_id": {
+          "name": "folio_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "field_name": {
+          "name": "field_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "string_value": {
+          "name": "string_value",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "number_value": {
+          "name": "number_value",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "ffi_folio_id_idx": {
+          "name": "ffi_folio_id_idx",
+          "columns": [
+            "folio_id"
+          ],
+          "isUnique": false
+        },
+        "ffi_field_string_idx": {
+          "name": "ffi_field_string_idx",
+          "columns": [
+            "field_name",
+            "string_value"
+          ],
+          "isUnique": false
+        },
+        "ffi_field_number_idx": {
+          "name": "ffi_field_number_idx",
+          "columns": [
+            "field_name",
+            "number_value"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "folio_field_index_folio_id_folios_id_fk": {
+          "name": "folio_field_index_folio_id_folios_id_fk",
+          "tableFrom": "folio_field_index",
+          "tableTo": "folios",
+          "columnsFrom": [
+            "folio_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "folio_links": {
+      "name": "folio_links",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": true
+        },
+        "from_folio_id": {
+          "name": "from_folio_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "from_field": {
+          "name": "from_field",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "to_folio_id": {
+          "name": "to_folio_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "to_codex": {
+          "name": "to_codex",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "sort_order": {
+          "name": "sort_order",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
+        }
+      },
+      "indexes": {
+        "fl_from_folio_field_idx": {
+          "name": "fl_from_folio_field_idx",
+          "columns": [
+            "from_folio_id",
+            "from_field"
+          ],
+          "isUnique": false
+        },
+        "fl_to_folio_idx": {
+          "name": "fl_to_folio_idx",
+          "columns": [
+            "to_folio_id"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "folio_links_from_folio_id_folios_id_fk": {
+          "name": "folio_links_from_folio_id_folios_id_fk",
+          "tableFrom": "folio_links",
+          "tableTo": "folios",
+          "columnsFrom": [
+            "from_folio_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "folio_links_to_folio_id_folios_id_fk": {
+          "name": "folio_links_to_folio_id_folios_id_fk",
+          "tableFrom": "folio_links",
+          "tableTo": "folios",
+          "columnsFrom": [
+            "to_folio_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "folio_revisions": {
+      "name": "folio_revisions",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": true
+        },
+        "folio_id": {
+          "name": "folio_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "stage": {
+          "name": "stage",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "fields": {
+          "name": "fields",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "author_id": {
+          "name": "author_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "folio_revisions_folio_id_idx": {
+          "name": "folio_revisions_folio_id_idx",
+          "columns": [
+            "folio_id"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "folio_revisions_folio_id_folios_id_fk": {
+          "name": "folio_revisions_folio_id_folios_id_fk",
+          "tableFrom": "folio_revisions",
+          "tableTo": "folios",
+          "columnsFrom": [
+            "folio_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "folio_revisions_author_id_users_id_fk": {
+          "name": "folio_revisions_author_id_users_id_fk",
+          "tableFrom": "folio_revisions",
+          "tableTo": "users",
+          "columnsFrom": [
+            "author_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "folio_terms": {
+      "name": "folio_terms",
+      "columns": {
+        "folio_id": {
+          "name": "folio_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "term_id": {
+          "name": "term_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "folio_terms_folio_id_folios_id_fk": {
+          "name": "folio_terms_folio_id_folios_id_fk",
+          "tableFrom": "folio_terms",
+          "tableTo": "folios",
+          "columnsFrom": [
+            "folio_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "folio_terms_term_id_terms_id_fk": {
+          "name": "folio_terms_term_id_terms_id_fk",
+          "tableFrom": "folio_terms",
+          "tableTo": "terms",
+          "columnsFrom": [
+            "term_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "folio_terms_folio_id_term_id_pk": {
+          "columns": [
+            "folio_id",
+            "term_id"
+          ],
+          "name": "folio_terms_folio_id_term_id_pk"
+        }
+      },
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "folios": {
+      "name": "folios",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": true
+        },
+        "codex": {
+          "name": "codex",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "stage": {
+          "name": "stage",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'draft'"
+        },
+        "fields": {
+          "name": "fields",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'{}'"
+        },
+        "author_id": {
+          "name": "author_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "folios_codex_stage_idx": {
+          "name": "folios_codex_stage_idx",
+          "columns": [
+            "codex",
+            "stage"
+          ],
+          "isUnique": false
+        },
+        "folios_codex_created_at_idx": {
+          "name": "folios_codex_created_at_idx",
+          "columns": [
+            "codex",
+            "created_at"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "folios_author_id_users_id_fk": {
+          "name": "folios_author_id_users_id_fk",
+          "tableFrom": "folios",
+          "tableTo": "users",
+          "columnsFrom": [
+            "author_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
     "plugin_status": {
       "name": "plugin_status",
       "columns": {
@@ -47,362 +464,6 @@
         }
       },
       "foreignKeys": {},
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "checkConstraints": {}
-    },
-    "post_field_index": {
-      "name": "post_field_index",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "integer",
-          "primaryKey": true,
-          "notNull": true,
-          "autoincrement": true
-        },
-        "post_id": {
-          "name": "post_id",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "field_name": {
-          "name": "field_name",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "string_value": {
-          "name": "string_value",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "number_value": {
-          "name": "number_value",
-          "type": "real",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        }
-      },
-      "indexes": {
-        "pfi_post_id_idx": {
-          "name": "pfi_post_id_idx",
-          "columns": [
-            "post_id"
-          ],
-          "isUnique": false
-        },
-        "pfi_field_string_idx": {
-          "name": "pfi_field_string_idx",
-          "columns": [
-            "field_name",
-            "string_value"
-          ],
-          "isUnique": false
-        },
-        "pfi_field_number_idx": {
-          "name": "pfi_field_number_idx",
-          "columns": [
-            "field_name",
-            "number_value"
-          ],
-          "isUnique": false
-        }
-      },
-      "foreignKeys": {
-        "post_field_index_post_id_posts_id_fk": {
-          "name": "post_field_index_post_id_posts_id_fk",
-          "tableFrom": "post_field_index",
-          "tableTo": "posts",
-          "columnsFrom": [
-            "post_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "checkConstraints": {}
-    },
-    "post_revisions": {
-      "name": "post_revisions",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "integer",
-          "primaryKey": true,
-          "notNull": true,
-          "autoincrement": true
-        },
-        "post_id": {
-          "name": "post_id",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "title": {
-          "name": "title",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "slug": {
-          "name": "slug",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "content": {
-          "name": "content",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "fields": {
-          "name": "fields",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "status": {
-          "name": "status",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "author_id": {
-          "name": "author_id",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        }
-      },
-      "indexes": {
-        "post_revisions_post_id_idx": {
-          "name": "post_revisions_post_id_idx",
-          "columns": [
-            "post_id"
-          ],
-          "isUnique": false
-        }
-      },
-      "foreignKeys": {
-        "post_revisions_post_id_posts_id_fk": {
-          "name": "post_revisions_post_id_posts_id_fk",
-          "tableFrom": "post_revisions",
-          "tableTo": "posts",
-          "columnsFrom": [
-            "post_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "post_revisions_author_id_users_id_fk": {
-          "name": "post_revisions_author_id_users_id_fk",
-          "tableFrom": "post_revisions",
-          "tableTo": "users",
-          "columnsFrom": [
-            "author_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "checkConstraints": {}
-    },
-    "post_terms": {
-      "name": "post_terms",
-      "columns": {
-        "post_id": {
-          "name": "post_id",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "term_id": {
-          "name": "term_id",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        }
-      },
-      "indexes": {},
-      "foreignKeys": {
-        "post_terms_post_id_posts_id_fk": {
-          "name": "post_terms_post_id_posts_id_fk",
-          "tableFrom": "post_terms",
-          "tableTo": "posts",
-          "columnsFrom": [
-            "post_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "post_terms_term_id_terms_id_fk": {
-          "name": "post_terms_term_id_terms_id_fk",
-          "tableFrom": "post_terms",
-          "tableTo": "terms",
-          "columnsFrom": [
-            "term_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {
-        "post_terms_post_id_term_id_pk": {
-          "columns": [
-            "post_id",
-            "term_id"
-          ],
-          "name": "post_terms_post_id_term_id_pk"
-        }
-      },
-      "uniqueConstraints": {},
-      "checkConstraints": {}
-    },
-    "posts": {
-      "name": "posts",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "integer",
-          "primaryKey": true,
-          "notNull": true,
-          "autoincrement": true
-        },
-        "post_type": {
-          "name": "post_type",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "title": {
-          "name": "title",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "slug": {
-          "name": "slug",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "content": {
-          "name": "content",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": "''"
-        },
-        "fields": {
-          "name": "fields",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": "'{}'"
-        },
-        "status": {
-          "name": "status",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": "'draft'"
-        },
-        "author_id": {
-          "name": "author_id",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "updated_at": {
-          "name": "updated_at",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        }
-      },
-      "indexes": {
-        "posts_post_type_slug_idx": {
-          "name": "posts_post_type_slug_idx",
-          "columns": [
-            "post_type",
-            "slug"
-          ],
-          "isUnique": true
-        }
-      },
-      "foreignKeys": {
-        "posts_author_id_users_id_fk": {
-          "name": "posts_author_id_users_id_fk",
-          "tableFrom": "posts",
-          "tableTo": "users",
-          "columnsFrom": [
-            "author_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        }
-      },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "checkConstraints": {}
@@ -528,53 +589,6 @@
       "uniqueConstraints": {},
       "checkConstraints": {}
     },
-    "taxonomies": {
-      "name": "taxonomies",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "integer",
-          "primaryKey": true,
-          "notNull": true,
-          "autoincrement": true
-        },
-        "name": {
-          "name": "name",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "slug": {
-          "name": "slug",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "hierarchical": {
-          "name": "hierarchical",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": 0
-        }
-      },
-      "indexes": {
-        "taxonomies_slug_unique": {
-          "name": "taxonomies_slug_unique",
-          "columns": [
-            "slug"
-          ],
-          "isUnique": true
-        }
-      },
-      "foreignKeys": {},
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "checkConstraints": {}
-    },
     "terms": {
       "name": "terms",
       "columns": {
@@ -585,8 +599,8 @@
           "notNull": true,
           "autoincrement": true
         },
-        "taxonomy_id": {
-          "name": "taxonomy_id",
+        "vocabulary_id": {
+          "name": "vocabulary_id",
           "type": "integer",
           "primaryKey": false,
           "notNull": true,
@@ -623,22 +637,22 @@
         }
       },
       "indexes": {
-        "terms_taxonomy_slug_idx": {
-          "name": "terms_taxonomy_slug_idx",
+        "terms_vocabulary_slug_idx": {
+          "name": "terms_vocabulary_slug_idx",
           "columns": [
-            "taxonomy_id",
+            "vocabulary_id",
             "slug"
           ],
           "isUnique": true
         }
       },
       "foreignKeys": {
-        "terms_taxonomy_id_taxonomies_id_fk": {
-          "name": "terms_taxonomy_id_taxonomies_id_fk",
+        "terms_vocabulary_id_vocabularies_id_fk": {
+          "name": "terms_vocabulary_id_vocabularies_id_fk",
           "tableFrom": "terms",
-          "tableTo": "taxonomies",
+          "tableTo": "vocabularies",
           "columnsFrom": [
-            "taxonomy_id"
+            "vocabulary_id"
           ],
           "columnsTo": [
             "id"
@@ -741,6 +755,53 @@
           "onUpdate": "no action"
         }
       },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "vocabularies": {
+      "name": "vocabularies",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": true
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "slug": {
+          "name": "slug",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "hierarchical": {
+          "name": "hierarchical",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
+        }
+      },
+      "indexes": {
+        "vocabularies_slug_unique": {
+          "name": "vocabularies_slug_unique",
+          "columns": [
+            "slug"
+          ],
+          "isUnique": true
+        }
+      },
+      "foreignKeys": {},
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "checkConstraints": {}

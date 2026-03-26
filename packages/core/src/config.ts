@@ -1,17 +1,17 @@
-import type { PostTypeDefinition } from './post-types/registry.js'
-import type { TaxonomyDefinition } from './taxonomies/registry.js'
+import type { CodexDefinition } from './codices/registry.js'
+import type { VocabularyDefinition } from './vocabularies/registry.js'
 import type { Plugin } from './plugins/types.js'
 
 export interface PhrasePressConfig {
-  postTypes:  PostTypeDefinition[]
-  taxonomies: TaxonomyDefinition[]
-  plugins:    Plugin[]
+  codices:      CodexDefinition[]
+  vocabularies: VocabularyDefinition[]
+  plugins:      Plugin[]
 }
 
 export function defineConfig(config: Partial<PhrasePressConfig>): PhrasePressConfig {
   return {
-    postTypes:  config.postTypes  ?? [],
-    taxonomies: config.taxonomies ?? [],
-    plugins:    config.plugins    ?? [],
+    codices:      config.codices      ?? [],
+    vocabularies: config.vocabularies ?? [],
+    plugins:      config.plugins      ?? [],
   }
 }

@@ -6,7 +6,19 @@ interface HookEntry<T> {
   priority: number
 }
 
-export class HookManager {
+/** Public interface for HookManager — use this in PluginContext to avoid nominal incompatibility between src/ and dist/ type resolutions. */
+export interface IHookManager {
+  addAction(hook: string, handler: ActionHandler, priority?: number): void
+  removeAction(hook: string, handler: ActionHandler): void
+  doAction(hook: string, ...args: unknown[]): Promise<void>
+  doActionSync(hook: string, ...args: unknown[]): void
+  addFilter(hook: string, handler: FilterHandler, priority?: number): void
+  removeFilter(hook: string, handler: FilterHandler): void
+  applyFilters(hook: string, value: unknown, ...args: unknown[]): Promise<unknown>
+  applyFiltersSync(hook: string, value: unknown, ...args: unknown[]): unknown
+}
+
+export class HookManager implements IHookManager {
   private readonly actions = new Map<string, HookEntry<ActionHandler>[]>()
   private readonly filters = new Map<string, HookEntry<FilterHandler>[]>()
 

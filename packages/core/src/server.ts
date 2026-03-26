@@ -9,16 +9,16 @@ import { fileURLToPath } from 'node:url'
 import { db } from './db/client.js'
 import { runMigrations } from './db/migrate.js'
 import { seedDatabase } from './db/seed.js'
-import { PostTypeRegistry } from './post-types/registry.js'
-import { TaxonomyRegistry } from './taxonomies/registry.js'
-import { syncTaxonomiesWithDb } from './taxonomies/sync.js'
+import { CodexRegistry } from './codices/registry.js'
+import { VocabularyRegistry } from './vocabularies/registry.js'
+import { syncVocabulariesWithDb } from './vocabularies/sync.js'
 import { HookManager } from './hooks/HookManager.js'
 import { PluginLoader } from './plugins/PluginLoader.js'
 import { registerAuth } from './auth/jwt.js'
 import {
-  postsRoutes,
-  taxonomiesRoutes,
-  postTermsRoutes,
+  folioRoutes,
+  folioTermsRoutes,
+  vocabulariesRoutes,
   authRoutes,
   usersRoutes,
   rolesRoutes,
@@ -37,25 +37,18 @@ export async function createServer(config: PhrasePressConfig) {
   await seedDatabase()
 
   // 2. Registri
-  const postTypeRegistry  = new PostTypeRegistry()
-  const taxonomyRegistry  = new TaxonomyRegistry()
-  const hooks             = new HookManager()
+  const codexRegistry      = new CodexRegistry()
+  const vocabularyRegistry = new VocabularyRegistry()
+  const hooks              = new HookManager()
 
-  // 3. Post type e taxonomy di default
-  postTypeRegistry.register({ name: 'post', label: 'Posts',  icon: 'pi-file-edit' })
-  postTypeRegistry.register({ name: 'page', label: 'Pages', icon: 'pi-file-o' })
+  // 3. Codici e vocabolari dal config utente
+  for (const cx  of config.codices)      codexRegistry.register(cx)
+  for (const voc of config.vocabularies) vocabularyRegistry.register(voc)
 
-  taxonomyRegistry.register({ slug: 'category', name: 'Categories', postTypes: ['post'], hierarchical: true })
-  taxonomyRegistry.register({ slug: 'tag',      name: 'Tags',       postTypes: ['post'], hierarchical: false })
+  // 4. Sync vocabolari nel DB
+  syncVocabulariesWithDb(vocabularyRegistry, db)
 
-  // 4. Post type e taxonomy dal config utente
-  for (const pt  of config.postTypes)  postTypeRegistry.register(pt)
-  for (const tax of config.taxonomies) taxonomyRegistry.register(tax)
-
-  // 5. Sync taxonomies nel DB
-  syncTaxonomiesWithDb(taxonomyRegistry, db)
-
-  // 6. Fastify
+  // 5. Fastify
   const fastify = Fastify({ logger: true })
 
   await fastify.register(helmet, { contentSecurityPolicy: false })
@@ -74,33 +67,37 @@ export async function createServer(config: PhrasePressConfig) {
     credentials: true,
   })
   await fastify.register(rateLimit, { max: 200, timeWindow: '1 minute' })
-  // 7. Auth plugin (JWT + cookie + decorators)
+  // 6. Auth plugin (JWT + cookie + decorators)
   await registerAuth(fastify)
 
-  // 8. Context plugin — inizializzato qui perché dipende da fastify
+  // 7. PluginContext
   const ctx: PluginContext = {
     hooks,
-    postTypes:  postTypeRegistry,
-    taxonomies: taxonomyRegistry,
+    codices:      codexRegistry,
+    vocabularies: vocabularyRegistry,
+    // backward-compat aliases
+    postTypes:  codexRegistry,
+    taxonomies: vocabularyRegistry,
     db,
     fastify,
     config,
   }
 
-  // 9. Plugin loader
+  // 8. Plugin loader
   const loader = new PluginLoader(config.plugins, ctx)
   await loader.loadAll()
 
-  // 10. Route API
+  // 9. Route API — ordine importante: statiche prima di quelle parametriche (/:codex)
   await fastify.register(async (app) => {
-    await app.register(authRoutes,       { prefix: '/auth' })
-    await app.register(usersRoutes,      { prefix: '/users' })
-    await app.register(rolesRoutes,      { prefix: '/roles' })
-    await app.register(postsRoutes,      { prefix: '/posts', postTypeRegistry, hooksManager: hooks })
-    await app.register(taxonomiesRoutes, { prefix: '/taxonomies', taxonomyRegistry })
-    await app.register(postTermsRoutes,  { prefix: '/posts',      taxonomyRegistry })
-    await app.register(pluginsRoutes,    { prefix: '/plugins',    loader })
-    await app.register(metaRoutes,       { prefix: '/',           postTypeRegistry, hooks })
+    await app.register(authRoutes,         { prefix: '/auth' })
+    await app.register(usersRoutes,        { prefix: '/users' })
+    await app.register(rolesRoutes,        { prefix: '/roles' })
+    await app.register(pluginsRoutes,      { prefix: '/plugins',      loader })
+    await app.register(vocabulariesRoutes, { prefix: '/vocabularies', vocabularyRegistry })
+    await app.register(metaRoutes,         { prefix: '/',             codexRegistry, hooks })
+    // Rotte parametriche /:codex registrate per ultime
+    await app.register(folioTermsRoutes,   { prefix: '/',             vocabularyRegistry })
+    await app.register(folioRoutes,        { prefix: '/',             codexRegistry, hooksManager: hooks })
   }, { prefix: '/api/v1' })
 
   // 11. Serve admin SPA in produzione
@@ -121,7 +118,7 @@ const port = parseInt(process.env['PORT'] ?? '3000', 10)
 const configPath = new URL('../../../config/phrasepress.config.js', import.meta.url).pathname
 const { default: userConfig } = await import(configPath).catch((err: unknown) => {
   console.error('[config] failed to load phrasepress.config:', err)
-  return { default: { postTypes: [], taxonomies: [], plugins: [] } }
+  return { default: { codices: [], vocabularies: [], plugins: [] } }
 })
 
 const app = await createServer(userConfig)

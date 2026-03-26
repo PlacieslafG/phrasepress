@@ -30,7 +30,7 @@ function serializeGroup(group: FieldGroupRow, items: FieldItemRow[]) {
     id:          group.id,
     name:        group.name,
     description: group.description,
-    postTypes:   JSON.parse(group.postTypes) as string[],
+    codices:     JSON.parse(group.postTypes) as string[],
     sortOrder:   group.sortOrder,
     createdAt:   group.createdAt,
     fields:      items.map(serializeItem),
@@ -39,7 +39,7 @@ function serializeGroup(group: FieldGroupRow, items: FieldItemRow[]) {
 
 // ─── Routes ───────────────────────────────────────────────────────────────────
 
-type GroupBody = { name: string; description?: string; postTypes?: string[] }
+type GroupBody = { name: string; description?: string; codices?: string[] }
 type FieldBody = {
   name: string; label?: string; type: string
   required?: boolean; queryable?: boolean; translatable?: boolean; options?: string[]
@@ -52,7 +52,7 @@ const groupBodySchema = {
   properties: {
     name:        { type: 'string', minLength: 1 },
     description: { type: 'string' },
-    postTypes:   { type: 'array', items: { type: 'string' } },
+    codices:     { type: 'array', items: { type: 'string' } },
   },
 }
 
@@ -89,7 +89,7 @@ export async function registerFieldRoutes(app: FastifyInstance, ctx: PluginConte
     const group = dbCreateGroup(ctx.db, {
       name:        req.body.name,
       description: req.body.description ?? '',
-      postTypes:   req.body.postTypes ?? [],
+      postTypes:   req.body.codices ?? [],
     })
     return reply.status(201).send(serializeGroup(group, []))
   })
@@ -111,7 +111,7 @@ export async function registerFieldRoutes(app: FastifyInstance, ctx: PluginConte
     const updated = dbUpdateGroup(ctx.db, req.params.id, {
       name:        req.body.name,
       description: req.body.description ?? '',
-      postTypes:   req.body.postTypes ?? [],
+      postTypes:   req.body.codices ?? [],
     })
     return serializeGroup(updated!, dbListItems(ctx.db, req.params.id))
   })

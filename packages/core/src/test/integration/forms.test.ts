@@ -3,8 +3,8 @@ import Fastify, { type FastifyInstance } from 'fastify'
 import { db } from '../../db/client.js'
 import { registerAuth } from '../../auth/jwt.js'
 import { HookManager } from '../../hooks/HookManager.js'
-import { PostTypeRegistry } from '../../post-types/registry.js'
-import { TaxonomyRegistry } from '../../taxonomies/registry.js'
+import { CodexRegistry } from '../../codices/registry.js'
+import { VocabularyRegistry } from '../../vocabularies/registry.js'
 import { PluginLoader } from '../../plugins/PluginLoader.js'
 import { authRoutes } from '../../api/index.js'
 import { loginAs } from '../helpers.js'
@@ -25,17 +25,19 @@ async function createFormsTestApp(): Promise<FastifyInstance> {
 
   await registerAuth(fastify)
 
-  const hooks     = new HookManager()
-  const postTypes = new PostTypeRegistry()
-  const taxonomies = new TaxonomyRegistry()
+  const hooks       = new HookManager()
+  const codices     = new CodexRegistry()
+  const vocabularies = new VocabularyRegistry()
 
   const ctx: PluginContext = {
     hooks,
-    postTypes,
-    taxonomies,
+    codices,
+    vocabularies,
+    postTypes:  codices,
+    taxonomies: vocabularies,
     db,
     fastify,
-    config: { postTypes: [], taxonomies: [], plugins: [] },
+    config: { codices: [], vocabularies: [], plugins: [] },
   }
 
   // Crea le tabelle del plugin (normalmente fatto in onActivate)

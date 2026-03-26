@@ -1,4 +1,4 @@
-import type { Plugin, PluginContext, PostTypeDefinition, FieldDefinition } from '@phrasepress/core'
+import type { Plugin, PluginContext, CodexDefinition, FieldDefinition } from '@phrasepress/core'
 import { createTables, dbListGroups, dbListItems } from './db.js'
 import { registerFieldRoutes } from './routes.js'
 
@@ -7,7 +7,8 @@ import { registerFieldRoutes } from './routes.js'
 export interface FieldGroupDef {
   name:         string
   description?: string
-  postTypes:    string[]
+  /** Codex names this group applies to (ex "postTypes") */
+  codices:      string[]
   fields:       FieldDefinition[]
 }
 
@@ -22,25 +23,25 @@ export function registerFieldGroup(def: FieldGroupDef): void {
 const fieldsPlugin: Plugin = {
   name:        'phrasepress-fields',
   version:     '1.0.0',
-  description: 'Gruppi di campi personalizzati per i post type',
+  description: 'Gruppi di campi personalizzati per i codici',
 
   async onActivate(ctx: PluginContext) {
     createTables(ctx.db)
   },
 
   async register(ctx: PluginContext) {
-    // Esegue le migration schema ad ogni boot (idempotente: CREATE IF NOT EXISTS + ALTER TABLE con try/catch)
+    // Esegue le migration schema ad ogni boot (idempotente)
     createTables(ctx.db)
 
-    // Inject field group fields into post type definitions at request time
-    ctx.hooks.addFilter('post_types.meta', (value: unknown) => {
-      const types = value as PostTypeDefinition[]
+    // Inject field group fields into codex definitions at request time
+    ctx.hooks.addFilter('codices.meta', (value: unknown) => {
+      const types = value as CodexDefinition[]
 
-      let dbGroups: Array<{ postTypes: string[]; fields: FieldDefinition[] }> = []
+      let dbGroups: Array<{ codices: string[]; fields: FieldDefinition[] }> = []
       try {
         dbGroups = dbListGroups(ctx.db).map(row => ({
-          postTypes: JSON.parse(row.postTypes) as string[],
-          fields:    dbListItems(ctx.db, row.id).map(item => ({
+          codices: JSON.parse(row.postTypes) as string[],
+          fields:  dbListItems(ctx.db, row.id).map(item => ({
             name:         item.name,
             label:        item.label || item.name,
             type:         item.type as FieldDefinition['type'],
@@ -57,18 +58,18 @@ const fieldsPlugin: Plugin = {
       }
 
       const allGroups = [
-        ...inMemoryGroups.map(g => ({ postTypes: g.postTypes, fields: g.fields })),
+        ...inMemoryGroups.map(g => ({ codices: g.codices, fields: g.fields })),
         ...dbGroups,
       ]
 
       if (allGroups.length === 0) return types
 
-      return types.map(pt => {
+      return types.map(cx => {
         const extra = allGroups
-          .filter(g => g.postTypes.includes(pt.name))
+          .filter(g => g.codices.includes(cx.name))
           .flatMap(g => g.fields)
-        if (extra.length === 0) return pt
-        return { ...pt, fields: [...(pt.fields ?? []), ...extra] }
+        if (extra.length === 0) return cx
+        return { ...cx, blueprint: [...(cx.blueprint ?? []), ...extra] }
       })
     })
 

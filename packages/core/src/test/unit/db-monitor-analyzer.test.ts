@@ -22,11 +22,11 @@ describe('analyzeIndexes', () => {
     }
   })
 
-  it('la tabella posts ha colonne con indici (postType+slug)', () => {
+  it('la tabella folios ha colonne con indici (codex+stage)', () => {
     const { tables } = analyzeIndexes(db)
-    const postsTable = tables.find(t => t.name === 'posts')
-    expect(postsTable).toBeDefined()
-    expect(postsTable!.indexes.length).toBeGreaterThan(0)
+    const foliosTable = tables.find(t => t.name === 'folios')
+    expect(foliosTable).toBeDefined()
+    expect(foliosTable!.indexes.length).toBeGreaterThan(0)
   })
 
   it('le colonne PK sono marcate come indexed=true', () => {

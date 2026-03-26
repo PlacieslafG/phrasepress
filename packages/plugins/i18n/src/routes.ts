@@ -36,33 +36,34 @@ function getTranslatorConfig(ctx: PluginContext): TranslatorConfig {
   }
 }
 
-// Recupera il post sorgente dal DB direttamente (senza pattern Fastify inject)
-function getSourcePost(ctx: PluginContext, postId: number) {
-  // Accediamo direttamente al DB del core tramite il context
+// Recupera il folio sorgente dal DB direttamente (senza pattern Fastify inject)
+function getSourcePost(ctx: PluginContext, folioId: number) {
   const { db } = ctx
   const raw = (db as unknown as { $client: { prepare(s: string): { get(id: number): unknown } } })
-    .$client.prepare('SELECT * FROM posts WHERE id = ?').get(postId) as null | {
-    id: number; post_type: string; title: string; content: string; fields: string; status: string
+    .$client.prepare('SELECT * FROM folios WHERE id = ?').get(folioId) as null | {
+    id: number; codex: string; stage: string; fields: string
   }
-  return raw ? {
-    id:       raw.id,
-    postType: raw.post_type,
-    title:    raw.title,
-    content:  raw.content,
-    fields:   JSON.parse(raw.fields) as Record<string, unknown>,
-    status:   raw.status,
-  } : null
+  if (!raw) return null
+  const fields = JSON.parse(raw.fields) as Record<string, unknown>
+  return {
+    id:      raw.id,
+    codex:   raw.codex,
+    title:   (fields['title'] as string) ?? '',
+    content: (fields['content'] as string) ?? '',
+    fields,
+    stage:   raw.stage,
+  }
 }
 
-// Recupera i field defs completi passando per il filtro post_types.meta.
+// Recupera i field defs completi passando per il filtro codices.meta.
 // Necessario per includere i campi definiti tramite il fields plugin (non solo quelli statici del registry).
 async function getFieldDefs(
   ctx: PluginContext,
-  postType: string,
+  codex: string,
 ): Promise<Array<{ name: string; type: string; fieldOptions?: Record<string, unknown> }>> {
-  const base = ctx.postTypes.getAll()
-  const filtered = await ctx.hooks.applyFilters('post_types.meta', base) as Array<{ name: string; fields?: Array<{ name: string; type: string; fieldOptions?: Record<string, unknown> }> }>
-  return filtered.find(pt => pt.name === postType)?.fields ?? []
+  const base = ctx.codices.getAll()
+  const filtered = await ctx.hooks.applyFilters('codices.meta', base) as Array<{ name: string; blueprint?: Array<{ name: string; type: string; fieldOptions?: Record<string, unknown> }> }>
+  return filtered.find(cx => cx.name === codex)?.blueprint ?? []
 }
 
 // ─── Background translation jobs ────────────────────────────────────────────
@@ -99,14 +100,14 @@ async function runTranslateAll(
         translateText(config, post.title,   localeRow.code),
         translateText(config, post.content, localeRow.code, true),
       ])
-      const fieldDefs = await getFieldDefs(ctx, post.postType)
+      const fieldDefs = await getFieldDefs(ctx, post.codex)
       const translatedFields = await translateFields(config, post.fields, fieldDefs, localeRow.code)
       const existing  = dbGetTranslation(ctx.db, postId, localeRow.code)
       const baseSlug  = generateSlug(translatedTitle)
       const finalSlug = ensureUniqueTranslationSlug(ctx.db, localeRow.code, baseSlug, existing?.id)
       dbUpsertTranslation(ctx.db, {
         postId, locale: localeRow.code, title: translatedTitle, slug: finalSlug,
-        content: translatedContent, fields: translatedFields, status: post.status, isDirty: false,
+        content: translatedContent, fields: translatedFields, status: post.stage, isDirty: false,
       })
       job.completed++
     } catch {
@@ -308,7 +309,7 @@ export async function registerI18nRoutes(app: FastifyInstance, ctx: PluginContex
       ])
 
       // Recupera field definitions tramite il filtro hook per includere i campi del fields plugin
-      const fieldDefs = await getFieldDefs(ctx, post.postType)
+      const fieldDefs = await getFieldDefs(ctx, post.codex)
       const translatedFields = await translateFields(config, post.fields, fieldDefs, locale)
 
       const existingTranslation = dbGetTranslation(ctx.db, postId, locale)
@@ -322,7 +323,7 @@ export async function registerI18nRoutes(app: FastifyInstance, ctx: PluginContex
         slug:    finalSlug,
         content: translatedContent,
         fields:  translatedFields,
-        status:  post.status,
+        status:  post.stage,
         isDirty: false,
       })
       return serializeTranslation(row)

@@ -3,8 +3,8 @@ import Fastify, { type FastifyInstance } from 'fastify'
 import { db } from '../../db/client.js'
 import { registerAuth } from '../../auth/jwt.js'
 import { HookManager } from '../../hooks/HookManager.js'
-import { PostTypeRegistry } from '../../post-types/registry.js'
-import { TaxonomyRegistry } from '../../taxonomies/registry.js'
+import { CodexRegistry } from '../../codices/registry.js'
+import { VocabularyRegistry } from '../../vocabularies/registry.js'
 import { PluginLoader } from '../../plugins/PluginLoader.js'
 import { authRoutes } from '../../api/index.js'
 import { loginAs } from '../helpers.js'
@@ -28,12 +28,14 @@ async function createMailerTestApp(): Promise<FastifyInstance> {
   await registerAuth(fastify)
 
   const ctx: PluginContext = {
-    hooks:     new HookManager(),
-    postTypes:  new PostTypeRegistry(),
-    taxonomies: new TaxonomyRegistry(),
+    hooks:        new HookManager(),
+    codices:      new CodexRegistry(),
+    vocabularies: new VocabularyRegistry(),
+    postTypes:    new CodexRegistry(),
+    taxonomies:   new VocabularyRegistry(),
     db,
     fastify,
-    config: { postTypes: [], taxonomies: [], plugins: [] },
+    config: { codices: [], vocabularies: [], plugins: [] },
   }
 
   createTables(db)

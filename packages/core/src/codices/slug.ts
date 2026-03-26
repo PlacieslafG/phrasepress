@@ -1,6 +1,6 @@
 import { eq, and, ne } from 'drizzle-orm'
 import type { Db } from '../db/client.js'
-import { posts } from '../db/schema.js'
+import { folios, folioFieldIndex } from '../db/schema.js'
 
 export function generateSlug(title: string): string {
   return title
@@ -13,9 +13,13 @@ export function generateSlug(title: string): string {
     .replace(/^-+|-+$/g, '')                 // rimuovi trattini iniziali/finali
 }
 
+/**
+ * Garantisce che lo slug sia unico per il Codex cercando collisioni
+ * nella folio_field_index (campo 'slug'). Aggiunge suffisso numerico se necessario.
+ */
 export function ensureUniqueSlug(
   db: Db,
-  postType: string,
+  codex: string,
   baseSlug: string,
   excludeId?: number,
 ): string {
@@ -24,21 +28,24 @@ export function ensureUniqueSlug(
 
   while (true) {
     const conditions = [
-      eq(posts.postType, postType),
-      eq(posts.slug, candidate),
+      eq(folios.codex, codex),
+      eq(folioFieldIndex.fieldName, 'slug'),
+      eq(folioFieldIndex.stringValue, candidate),
     ]
-    if (excludeId !== undefined) {
-      conditions.push(ne(posts.id, excludeId))
-    }
 
-    const existing = db
-      .select({ id: posts.id })
-      .from(posts)
+    const query = db
+      .select({ id: folios.id })
+      .from(folios)
+      .innerJoin(folioFieldIndex, eq(folioFieldIndex.folioId, folios.id))
       .where(and(...conditions))
       .limit(1)
       .all()
 
-    if (existing.length === 0) return candidate
+    const conflict = excludeId !== undefined
+      ? query.filter(r => r.id !== excludeId)
+      : query
+
+    if (conflict.length === 0) return candidate
 
     candidate = `${baseSlug}-${counter}`
     counter++

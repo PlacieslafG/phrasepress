@@ -3,6 +3,15 @@
 
 export { defineConfig }                 from './config.js'
 export type { PhrasePressConfig }       from './config.js'
-export type { PostTypeDefinition, FieldDefinition, FieldType } from './post-types/registry.js'
-export type { TaxonomyDefinition }      from './taxonomies/registry.js'
+export type {
+  CodexDefinition,
+  FieldDefinition,
+  FieldType,
+  StageDefinition,
+  PostTypeDefinition,   // alias backward-compat
+} from './codices/registry.js'
+export type {
+  VocabularyDefinition,
+  TaxonomyDefinition,   // alias backward-compat
+} from './vocabularies/registry.js'
 export type { Plugin, PluginContext }   from './plugins/types.js'

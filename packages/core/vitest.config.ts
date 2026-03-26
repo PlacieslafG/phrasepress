@@ -4,6 +4,7 @@ export default defineConfig({
   test: {
     globals:      true,
     environment:  'node',
+    include:      ['src/test/**/*.test.ts'],
     setupFiles:   ['./src/test/setup.ts'],
     env: {
       DATABASE_PATH:       ':memory:',
