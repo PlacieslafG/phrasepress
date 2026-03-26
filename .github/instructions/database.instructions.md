@@ -1,6 +1,6 @@
 ---
 applyTo: "packages/core/src/db/**"
-description: "Use when working on the database layer: Drizzle ORM schema, SQLite migrations, seed data, DB client, tables for posts, taxonomies, terms, users, roles, revisions, custom field index, media."
+description: "Use when working on the database layer: Drizzle ORM schema, SQLite migrations, seed data, DB client, tables for folios, vocabularies, terms, users, roles, revisions, custom field index, media."
 ---
 
 # Istruzioni — Database (Drizzle + SQLite)
@@ -39,12 +39,12 @@ db.transaction(tx => {
 |---|---|
 | `roles` | Ruoli con `capabilities` come JSON array (`TEXT`) |
 | `users` | Utenti con `roleId` FK, `passwordHash` (argon2) |
-| `posts` | Post con `postType`, `fields` (JSON blob), `status` |
+| `folios` | Contenuti con `codex`, `fields` (JSON blob), `stage` |
 | `post_field_index` | Indice queryable dei custom fields (DELETE+INSERT su update) |
-| `post_revisions` | Snapshot dei post prima di ogni update |
-| `taxonomies` | Definizioni taxonomy (sincronizzate dal registry al boot) |
+| `post_revisions` | Snapshot dei folii prima di ogni update |
+| `vocabularies` | Definizioni vocabulary (sincronizzate dal registry al boot) |
 | `terms` | Termini con `parentId` self-referencing (gerarchie) |
-| `post_terms` | Associazione N:M post↔term (PK composta) |
+| `folio_terms` | Associazione N:M folio↔term (PK composta) |
 | `plugin_status` | Stato attivi/inattivi di ogni plugin |
 | `refresh_tokens` | Hash dei refresh token (mai in chiaro) con scadenza |
 
@@ -57,8 +57,8 @@ db.transaction(tx => {
 - Definire sempre i constraint (`notNull()`, `unique()`, `references()`) nello schema, non a mano nelle query.
 - Gli indici critici definiti nello schema:
   - `post_field_index`: indice su `(fieldName, stringValue)` e `(fieldName, numberValue)`
-  - `posts`: indice unico su `(postType, slug)`
-  - `terms`: indice unico su `(taxonomyId, slug)`
+  - `folios`: indice unico su `(codex, slug)`, indici su `(codex, stage)` e `(codex, createdAt)`
+  - `terms`: indice unico su `(vocabularyId, slug)`
   - `refresh_tokens`: indice su `userId`
 
 ## Pattern query
@@ -67,7 +67,7 @@ db.transaction(tx => {
 - Per le query con filtri dinamici (es. `GET /posts` con molti query param opzionali): costruire la lista `where` come array e fare `.where(and(...conditions))`.
 - Per aggiornamenti `post_field_index`: sempre **DELETE + INSERT**, non UPDATE:
   ```ts
-  tx.delete(postFieldIndex).where(eq(postFieldIndex.postId, id)).run()
+  tx.delete(postFieldIndex).where(eq(postFieldIndex.folioId, id)).run()
   tx.insert(postFieldIndex).values(newRows).run()
   ```
 

@@ -251,13 +251,13 @@ const PLUGIN_IMPORT: Record<PluginName, string> = {
 }
 
 async function configurePluginsAndTypes(): Promise<void> {
-  printSection('Plugins & Post Types')
+  printSection('Plugins, Codici & Vocabolari')
 
   // Plugin selection
-  print('  Available plugins:')
+  print('  Plugin disponibili:')
   ALL_PLUGINS.forEach((p, i) => print(`    ${cyan(String(i + 1))}. ${p}`))
   print('')
-  const pluginAnswer = await ask('Enable plugins (comma-separated numbers, "all", or "none")', 'all')
+  const pluginAnswer = await ask('Abilita plugin (numeri separati da virgola, "all" o "none")', 'all')
 
   let selectedPlugins: PluginName[]
   if (pluginAnswer.toLowerCase() === 'all') {
@@ -270,23 +270,23 @@ async function configurePluginsAndTypes(): Promise<void> {
       .filter(i => i >= 0 && i < ALL_PLUGINS.length)
       .map(i => ALL_PLUGINS[i])
     if (selectedPlugins.length === 0) {
-      print(yellow('  No valid plugin indices entered — no plugins will be enabled.'))
+      print(yellow('  Nessun indice valido — nessun plugin abilitato.'))
     }
   }
 
-  print(green(`  Selected: ${selectedPlugins.length > 0 ? selectedPlugins.join(', ') : 'none'}`))
+  print(green(`  Selezionati: ${selectedPlugins.length > 0 ? selectedPlugins.join(', ') : 'nessuno'}`))
 
-  // Custom post type
+  // Custom codex
   print('')
-  const addPostType = await askYesNo('Add a sample custom post type?', false)
-  let postTypeName = ''
-  let postTypeLabel = ''
-  if (addPostType) {
-    postTypeName = await ask('Post type name (e.g. product, event)')
-    postTypeLabel = await ask('Post type label (e.g. Products, Events)')
-    if (!postTypeName) {
-      print(yellow('  Empty name — skipping custom post type.'))
-      postTypeName = ''
+  const addCodex = await askYesNo('Aggiungere un codice personalizzato (es. product, event)?', false)
+  let codexName = ''
+  let codexLabel = ''
+  if (addCodex) {
+    codexName  = await ask('Nome codex (es. product, event)')
+    codexLabel = await ask('Label codex (es. Products, Events)')
+    if (!codexName) {
+      print(yellow('  Nome vuoto — codex personalizzato saltato.'))
+      codexName = ''
     }
   }
 
@@ -295,45 +295,77 @@ async function configurePluginsAndTypes(): Promise<void> {
     .map(p => `    ${PLUGIN_IMPORT[p]},`)
     .join('\n')
 
-  const postTypeBlock =
-    postTypeName
+  const extraCodexBlock =
+    codexName
       ? `
     {
-      name: '${postTypeName}',
-      label: '${postTypeLabel || postTypeName}',
+      name: '${codexName}',
+      label: '${codexLabel || codexName}',
       icon: 'pi-box',
-      fields: [
-        // Add custom fields here:
-        // { name: 'price', type: 'number', label: 'Price', queryable: true },
+      stages: DEFAULT_STAGES,
+      blueprint: [
+        { name: 'title', type: 'string', label: 'Titolo', queryable: true, required: true },
+        { name: 'slug',  type: 'slug',   label: 'Slug',   slugSource: 'title' },
+        // Aggiungi altri campi qui:
+        // { name: 'price', type: 'number', label: 'Prezzo', queryable: true },
       ],
+      displayField: 'title',
     },`
       : `
-    // Uncomment to add a custom post type:
+    // Aggiungi altri codici qui:
     // {
-    //   name: 'product',
-    //   label: 'Products',
-    //   icon: 'pi-box',
-    //   fields: [
-    //     { name: 'price', type: 'number', label: 'Price', queryable: true },
+    //   name: 'product', label: 'Products', icon: 'pi-box',
+    //   stages: DEFAULT_STAGES,
+    //   blueprint: [
+    //     { name: 'title', type: 'string', label: 'Titolo', queryable: true, required: true },
+    //     { name: 'slug',  type: 'slug',   label: 'Slug',   slugSource: 'title' },
+    //     { name: 'price', type: 'number', label: 'Prezzo', queryable: true },
     //   ],
+    //   displayField: 'title',
     // },`
 
-  const taxonomiesBlock = `
-    // Uncomment to add a custom taxonomy:
-    // {
-    //   slug: 'genre',
-    //   name: 'Genres',
-    //   postTypes: ['${postTypeName || 'product'}'],
-    //   hierarchical: true,
-    // },`
+  const extraVocabularyBlock = codexName
+    ? `
+    // { slug: 'genre', name: 'Genres', codices: ['${codexName}'], hierarchical: true },`
+    : `
+    // Aggiungi altri vocabolari qui:
+    // { slug: 'genre', name: 'Genres', codices: ['product'], hierarchical: true },`
 
   const configContent = `import { defineConfig } from '../packages/core/src/config.js'
 
+const DEFAULT_STAGES = [
+  { name: 'draft',     label: 'Bozza',      initial: true },
+  { name: 'published', label: 'Pubblicato' },
+  { name: 'trash',     label: 'Cestino',    final: true  },
+]
+
 export default defineConfig({
-  postTypes: [${postTypeBlock}
+  codices: [
+    {
+      name: 'post', label: 'Posts', icon: 'pi-file-edit',
+      stages: DEFAULT_STAGES,
+      blueprint: [
+        { name: 'title',   type: 'string',   label: 'Titolo',    queryable: true, required: true },
+        { name: 'slug',    type: 'slug',     label: 'Slug',      slugSource: 'title' },
+        { name: 'content', type: 'richtext', label: 'Contenuto' },
+      ],
+      displayField: 'title',
+    },
+    {
+      name: 'page', label: 'Pages', icon: 'pi-file-o',
+      stages: DEFAULT_STAGES,
+      blueprint: [
+        { name: 'title',   type: 'string',   label: 'Titolo',    queryable: true, required: true },
+        { name: 'slug',    type: 'slug',     label: 'Slug',      slugSource: 'title' },
+        { name: 'content', type: 'richtext', label: 'Contenuto' },
+      ],
+      displayField: 'title',
+    },${extraCodexBlock}
   ],
 
-  taxonomies: [${taxonomiesBlock}
+  vocabularies: [
+    { slug: 'category', name: 'Categories', codices: ['post'], hierarchical: true  },
+    { slug: 'tag',       name: 'Tags',       codices: ['post'], hierarchical: false },${extraVocabularyBlock}
   ],
 
   plugins: [
@@ -343,7 +375,7 @@ ${pluginImports}
 `
 
   await fs.writeFile(CONFIG_FILE, configContent, 'utf8')
-  print(green(`  ✓  phrasepress.config.ts updated`))
+  print(green(`  ✓  phrasepress.config.ts aggiornato`))
 }
 
 // ---------------------------------------------------------------------------
@@ -579,7 +611,7 @@ async function main() {
 
   // ── phrasepress.config.ts (optional) ─────────────────────────────────────
   print('')
-  const configureTs = await askYesNo('Configure plugins and post types in phrasepress.config.ts?', false)
+  const configureTs = await askYesNo('Configurare plugin, codici e vocabolari in phrasepress.config.ts?', false)
   if (configureTs) {
     await configurePluginsAndTypes()
   }

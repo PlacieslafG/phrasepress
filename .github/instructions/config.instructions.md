@@ -1,6 +1,6 @@
 ---
 applyTo: "config/**"
-description: "Use when working on phrasepress.config.ts, defining custom post types, custom taxonomies, registering plugins, or using defineConfig, PostTypeDefinition, TaxonomyDefinition, FieldDefinition APIs."
+description: "Use when working on phrasepress.config.ts, defining custom codex types, custom vocabularies, registering plugins, or using defineConfig, CodexDefinition, VocabularyDefinition, FieldDefinition APIs."
 ---
 
 # Istruzioni — Configurazione utente (`phrasepress.config.ts`)
@@ -14,24 +14,29 @@ description: "Use when working on phrasepress.config.ts, defining custom post ty
 import { defineConfig } from '../packages/core/src/config.js'
 
 export default defineConfig({
-  postTypes:  [...],
-  taxonomies: [...],
-  plugins:    [...],
+  codices:     [...],
+  vocabularies: [...],
+  plugins:     [...],
 })
 ```
 
 `defineConfig` è l'unico punto di ingresso — non esportare oggetti raw. Il file è caricato dinamicamente al boot di `createServer()`.
 
-## Custom Post Types
+## Custom Codex (tipi di contenuto)
 
 ```ts
-import type { PostTypeDefinition } from '../packages/core/src/post-types/registry.js'
+import type { CodexDefinition } from '../packages/core/src/codices/registry.js'
 
 {
   name:   'product',        // identificatore (snake_case) — usato nelle URL e nel DB
   label:  'Products',       // label plurale mostrata nell'admin
   icon?:  'pi-box',         // nome icona PrimeIcons (opzionale)
-  fields?: [                // custom fields (opzionale)
+  stages?: [                // workflow stages (opzionale, default: draft/published/trash)
+    { name: 'draft',     label: 'Bozza',      initial: true },
+    { name: 'published', label: 'Pubblicato', final: false },
+    { name: 'archived',  label: 'Archiviato', final: true },
+  ],
+  blueprint?: [             // custom fields (opzionale)
     {
       name:      'price',
       type:      'number',
@@ -40,7 +45,7 @@ import type { PostTypeDefinition } from '../packages/core/src/post-types/registr
       required:  false,
     },
     {
-      name:    'status_custom',
+      name:    'availability',
       type:    'select',
       label:   'Availability',
       options: ['in-stock', 'out-of-stock', 'pre-order'],
@@ -61,23 +66,23 @@ import type { PostTypeDefinition } from '../packages/core/src/post-types/registr
 | `select` | Selezione singola | Richiede `options: string[]` |
 | `textarea` | Testo lungo | Textarea piana |
 | `image` | Immagine da media library | Richiede plugin media attivo |
-| `relationship` | Riferimento ad altro post | Richiede `fieldOptions.postType` |
+| `relationship` | Riferimento ad altro folio | Richiede `fieldOptions.postType` (nome codex) |
 | `repeater` | Lista di sottocampi | Richiede `fieldOptions.fields` |
 
-## Custom Taxonomies
+## Custom Vocabularies (tassonomie)
 
 ```ts
 {
   slug:         'genre',      // identificatore (kebab-case) — usato nelle URL
   name:         'Genres',     // label plurale mostrata nell'admin
-  postTypes:    ['product'],  // post type a cui si applica (array)
+  codices:      ['product'],  // codex a cui si applica (array)
   hierarchical: true,         // true = categorie (con parent), false = tag
   icon?:        'pi-tags',    // icona PrimeIcons (opzionale)
 }
 ```
 
-- Le taxonomies vengono sincronizzate nel DB al boot tramite `syncTaxonomiesWithDb()`.
-- Post types built-in (`post`, `page`) hanno già `category` e `tag` registrate di default.
+- Le vocabularies vengono sincronizzate nel DB al boot tramite `syncVocabulariesWithDb()`.
+- Codices built-in (`post`, `page`) hanno già `category` e `tag` registrate di default.
 - Non registrare taxonomy con lo stesso `slug` dei built-in — lancerebbe un errore.
 
 ## Plugin

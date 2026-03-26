@@ -61,21 +61,21 @@ packages/
   core/src/
     db/          # schema Drizzle, client singleton, migrate, seed
     hooks/       # HookManager (actions + filters)
-    post-types/  # PostTypeRegistry, slug utils
-    taxonomies/  # TaxonomyRegistry, sync con DB
+    codices/     # CodexRegistry, slug utils
+    vocabularies/ # VocabularyRegistry, sync con DB
     plugins/     # PluginLoader, interfacce Plugin
     auth/        # JWT, password argon2, capabilities
-    api/         # route Fastify (posts, taxonomies, auth, users, roles, plugins)
+    api/         # route Fastify (folios, vocabularies, auth, users, roles, plugins)
     index.ts     # bootstrap: init DB → registri → hook → plugin → Fastify
   admin/src/
     router/      # Vue Router con guard
-    stores/      # Pinia: auth, app (post types + taxonomies)
-    api/         # client fetch tipizzato con auto-refresh
+    stores/      # Pinia: auth, app (codices + vocabularies)
+    api/         # client fetch tipizzato con auto-refresh (folios.ts, vocabularies.ts, ...)
     layouts/     # AdminLayout con sidebar dinamica
     pages/       # una directory per area funzionale
     components/  # componenti riutilizzabili
 config/
-  phrasepress.config.ts  # entry point utente: registerPostType, registerTaxonomy, plugins
+  phrasepress.config.ts  # entry point utente: codices, vocabularies, plugins
 ```
 
 ## Regole generali
@@ -106,15 +106,15 @@ Il `HookManager` è il meccanismo di estensione centrale. Prima di aggiungere lo
 I plugin ricevono un oggetto `PluginContext` con tutto il necessario. Non usare import diretti dal core nei plugin — tutto passa dal context.
 
 ### Slug
-Sempre generato da `generateSlug(title)` e reso unico con `ensureUniqueSlug(db, postType, slug)`. Unicità a livello di `(postType, slug)` per i post, `(taxonomyId, slug)` per i terms.
+Sempre generato da `generateSlug(title)` e reso unico con `ensureUniqueSlug(db, codex, slug)`. Unicità a livello di `(codex, slug)` per i folii, `(vocabularyId, slug)` per i terms.
 
 ### Custom fields performance
-- I valori dei custom fields sono salvati come JSON blob in `posts.fields` (zero JOIN per lettura)
+- I valori dei custom fields sono salvati come JSON blob in `folios.fields` (zero JOIN per lettura)
 - I campi con `queryable: true` sono duplicati in `post_field_index` con colonne `stringValue` e `numberValue` indicizzate
-- Quando si aggiorna un post: DELETE + INSERT su `post_field_index` per quel post (non UPDATE individuali)
+- Quando si aggiorna un folio: DELETE + INSERT su `post_field_index` per quel folio (non UPDATE individuali)
 
 ### Revisioni
-Ad ogni `PUT /posts/:id` creare una riga in `post_revisions` PRIMA di aggiornare il post. Non dopo.
+Ad ogni `PUT /:codex/:id` creare una riga in `post_revisions` PRIMA di aggiornare il folio. Non dopo.
 
 ## Sicurezza
 

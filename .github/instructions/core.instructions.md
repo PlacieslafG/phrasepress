@@ -1,11 +1,21 @@
 ---
 applyTo: "packages/core/src/**"
-description: "Use when working on the core Node.js TypeScript package: ESM imports, TypeScript strict mode, post types, slug generation, custom fields, field index, revisions, bootstrap sequence, Fastify server setup."
+description: "Use when working on the core Node.js TypeScript package: ESM imports, TypeScript strict mode, codex types, slug generation, custom fields, field index, revisions, bootstrap sequence, Fastify server setup."
 ---
 
 # Istruzioni — Core TypeScript (Node.js)
 
 **Documentazione di riferimento:** `docs/01-setup.md`, `docs/03-post-types.md`
+
+## Terminologia fondamentale
+
+| Termine | Significato |
+|---|---|
+| **Codex** | Tipo di contenuto (ex "post type"). Definisce blueprint e stages. |
+| **Folio** | Singola istanza di contenuto (ex "post"). Ha `codex`, `stage`, `fields`. |
+| **Vocabulary** | Tassonomia (ex "taxonomy"). Raggruppa terms. |
+| **Stage** | Fase del workflow di un folio (ex "status"). Default: `draft`, `published`, `trash`. |
+| **Blueprint** | Array di `FieldDefinition` che descrivono i campi custom di un codex. |
 
 ## Moduli ESM
 
@@ -27,17 +37,17 @@ description: "Use when working on the core Node.js TypeScript package: ESM impor
 ## Struttura file — distinzione importante
 
 - `src/index.ts` — **Entry point pubblico del package** (`@phrasepress/core`). Esporta solo i tipi e funzioni usati da plugin e `phrasepress.config.ts`. Non contiene logica bootstrap.
-- `src/server.ts` — **Bootstrap del server**. La funzione `createServer(config)` esegue migration, registra post types/taxonomies, carica plugin, crea l'istanza Fastify.
+- `src/server.ts` — **Bootstrap del server**. La funzione `createServer(config)` esegue migration, registra codices/vocabularies, carica plugin, crea l'istanza Fastify.
 - Non importare da `src/server.ts` nei plugin — usare solo i tipi esportati da `src/index.ts`.
 
 ## Ordine bootstrap in `src/server.ts`
 
 L'ordine di `createServer(config)` è preciso e non va alterato:
 1. `runMigrations()` + `seedDatabase()`
-2. Crea `PostTypeRegistry`, `TaxonomyRegistry`, `HookManager`
-3. Registra post types e taxonomies **di default** (`post`, `page`, `category`, `tag`)
-4. Registra post types e taxonomies dal **config utente**
-5. `syncTaxonomiesWithDb(taxonomyRegistry, db)`
+2. Crea `CodexRegistry`, `VocabularyRegistry`, `HookManager`
+3. Registra codices e vocabularies **di default** (`post`, `page`, `category`, `tag`)
+4. Registra codices e vocabularies dal **config utente**
+5. `syncVocabulariesWithDb(vocabularyRegistry, db)`
 6. Crea istanza Fastify + plugin (`helmet`, `cors`, `rateLimit`)
 7. `registerAuth(fastify)` — JWT + cookie + decorators
 8. Crea `PluginContext` + `PluginLoader` → carica plugin attivi
@@ -49,7 +59,7 @@ L'ordine di `createServer(config)` è preciso e non va alterato:
 ## Tipi chiave del pacchetto
 
 ```ts
-// Tipi field (src/post-types/registry.ts)
+// Tipi field (src/codices/registry.ts)
 type FieldType = 'string' | 'number' | 'boolean' | 'richtext' | 'date'
                | 'select' | 'textarea' | 'image' | 'relationship' | 'repeater'
 
@@ -61,9 +71,10 @@ function doSomething(tx: Tx, postId: number) { ... }
 
 ## PostTypeRegistry e TaxonomyRegistry
 
+- Rinominati in `CodexRegistry` e `VocabularyRegistry` rispettivamente.
 - Entrambi sono singleton passati nel `PluginContext` — non istanziarli di nuovo altrove.
-- I post type si registrano tramite `registry.register()` — non nel DB (la lista è in-memory, ricostruita ad ogni boot).
-- `TaxonomyRegistry` ha `getForPostType(postType)` — utile per API che filtrano per post type.
+- I codices si registrano tramite `registry.register()` — non nel DB (lista in-memory, ricostruita ad ogni boot).
+- `VocabularyRegistry` ha `getForCodex(codex)` — utile per API che filtrano per codex.
 
 ## Gestione errori
 
@@ -96,5 +107,5 @@ function doSomething(tx: Tx, postId: number) { ... }
 ## Slug generation
 
 - `generateSlug(title: string): string` — lowercase, spazi → trattini, rimuove caratteri non-alfanumerici.
-- `ensureUniqueSlug(db, postType, baseSlug, excludeId?): string` — sincrono (better-sqlite3 è sync). Aggiunge suffisso `-2`, `-3`, ecc.
+- `ensureUniqueSlug(db, codex, baseSlug, excludeId?): string` — sincrono (better-sqlite3 è sync). Aggiunge suffisso `-2`, `-3`, ecc.
 - Chiamare `ensureUniqueSlug` sempre al momento della creazione/modifica slug, anche se arriva già dallo slug manuale dell'utente.

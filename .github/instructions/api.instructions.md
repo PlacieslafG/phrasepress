@@ -9,18 +9,19 @@ description: "Use when writing or modifying Fastify API routes: REST endpoints, 
 
 ## Struttura route
 
-- Ogni area funzionale ha il suo file Fastify plugin: `posts.ts`, `taxonomies.ts`, `auth.ts`, `users.ts`, `roles.ts`, `plugins.ts`, `meta.ts`.
+- Ogni area funzionale ha il suo file Fastify plugin: `folios.ts`, `vocabularies.ts`, `auth.ts`, `users.ts`, `roles.ts`, `plugins.ts`, `meta.ts`.
 - I plugin Fastify sono registrati in `src/api/index.ts` con prefisso `/api/v1`.
-- Usare `fastify.register(plugin, { prefix: '/posts' })` — non concatenare prefissi a mano nelle route.
+- Usare `fastify.register(plugin, { prefix: '/folios' })` — non concatenare prefissi a mano nelle route.
 
 ## Route meta disponibili (`src/api/meta.ts`)
 
 | Route | Descrizione |
 |---|---|
-| `GET /api/v1/post-types` | Lista dei post type registrati (filtrata da hook `post_types.meta`) |
-| `GET /api/v1/stats` | Conteggi post per tipo e stato (`{ [postType]: { published, draft, trash, total } }`) |
+| `GET /api/v1/codices` | Lista dei codex registrati (filtrata da hook `codices.meta`) |
+| `GET /api/v1/vocabularies` | Lista dei vocabulary registrati |
+| `GET /api/v1/stats` | Conteggi folii per codex e stage (`{ [codex]: { [stage]: count, total } }`) |
 
-Entrambe richiedono `authenticate`. Le route meta non richiedono capability specifica — sono accessibili a qualsiasi utente autenticato.
+Tutte richiedono `authenticate`. Non richiedono capability specifica.
 
 ## Schema validazione
 
@@ -29,17 +30,16 @@ Entrambe richiedono `authenticate`. Le route meta non richiedono capability spec
 - Per i response schema: definire almeno lo schema `200`. Gli errori 4xx/5xx sono gestiti dall'error handler globale.
 - Esempio pattern:
   ```ts
-  fastify.post('/posts', {
+  fastify.post('/:codex', {
     schema: {
+      params: { type: 'object', required: ['codex'], properties: { codex: { type: 'string' } } },
       body: {
         type: 'object',
-        required: ['postType', 'title'],
+        required: ['fields'],
         properties: {
-          postType: { type: 'string' },
-          title:    { type: 'string', minLength: 1 },
-          slug:     { type: 'string' },
-          content:  { type: 'string' },
-          status:   { type: 'string', enum: ['draft', 'published'] },
+          fields:  { type: 'object' },
+          stage:   { type: 'string' },
+          termIds: { type: 'array', items: { type: 'integer' } },
         }
       }
     }
@@ -89,10 +89,10 @@ La `Tx` è importata da `'../db/client.js'` e tipizza il callback della transazi
   ```
 - Usare `LIMIT` e `OFFSET` in SQLite: `offset = (page - 1) * limit`.
 
-## Query filtri dinamici per i post
+## Query filtri dinamici per i folii
 
 - I filtri su custom fields queryable usano la sintassi `?fieldName[op]=value` (es. `?price[lt]=50`).
-- I filtri su taxonomy terms usano `?taxonomySlug=termSlug` (es. `?genre=fantasy`).
+- I filtri su vocabulary terms usano `?vocabularySlug=termSlug` (es. `?genre=fantasy`).
 - Costruire le condizioni WHERE come array e combinarle con `and(...)` di Drizzle.
 - JOIN con `post_field_index` solo quando il filtro è presente — non sempre.
 

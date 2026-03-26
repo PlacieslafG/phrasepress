@@ -18,7 +18,7 @@ description: "Use when working on the Admin UI: Vue 3 components, pages, layouts
 ## State management (Pinia)
 
 - Lo store `auth` gestisce: `user`, `accessToken`, `isLoggedIn`, `login()`, `logout()`, `refreshToken()`, `fetchMe()`, `clearSession()`, `hasCapability()`, `sessionRestored`.
-- Lo store `app` gestisce: `postTypes`, `taxonomies` — caricati una volta dopo il login.
+- Lo store `app` gestisce: `codices`, `vocabularies` — caricati una volta dopo il login. Sono disponibili anche gli alias backward-compat `postTypes` (computed da `codices`) e `taxonomies` (computed da `vocabularies`).
 - Non duplicare stato tra store e componenti locali — se un dato serve in più posti, sta nel Pinia store.
 - `storeToRefs()` per destructurare store con reattività preservata.
 
@@ -92,6 +92,56 @@ authStore.hasCapability('manage_users')  // true se è administrator o ha la cap
 - Il valore è sempre HTML serializzato (`editor.getHTML()`).
 - Il componente funziona come `v-model`: riceve `modelValue: string` e emette `update:modelValue`.
 - Non aggiungere extensions Tiptap non necessarie — ogni extension ha un peso.
+
+## Entità principali — terminologia
+
+| Vecchio (deprecato) | Nuovo | Significato |
+|---|---|---|
+| `postTypes` | `codices` | Tipi di contenuto registrati |
+| `taxonomies` | `vocabularies` | Tassonomie registrate |
+| `Post` | `Folio` | Singolo contenuto |
+| `status` (draft/published) | `stage` | Fase del workflow |
+| `postType` (param route) | `codex` (param route) | Nome del tipo di contenuto |
+| `/posts/:type` | `/folios/:codex` | Route lista contenuti |
+| `/taxonomy/:slug` | `/vocabulary/:slug` | Route gestione terms |
+
+## API client (`api/folios.ts`)
+
+- **Usare `foliosApi`** da `@/api/folios.js` per tutte le operazioni CRUD sui contenuti.
+- **Non usare** il vecchio `postsApi` da `api/posts.js` — file eliminato. Usare `foliosApi` da `api/folios.js`.
+- `foliosApi.list(codex, params)` — lista folii con filtri (stage, search, ecc.)
+- `foliosApi.get(codex, id)` — singolo folio
+- `foliosApi.create(codex, data)` — crea folio
+- `foliosApi.update(codex, id, data)` — aggiorna folio
+- `foliosApi.delete(codex, id)` — elimina/cestina
+- Il **`Folio`** ha: `id`, `codex`, `stage`, `fields: Record<string,unknown>`, `terms: TermSummary[]`
+- I campi strutturati (`title`, `slug`, `content`) vivono dentro `folio.fields.title` ecc.
+- Il termine di una vocabulary è in `term.vocabularySlug` (non `taxonomySlug`)
+
+## Store `app.ts` — interfacce chiave
+
+```ts
+export interface CodexDefinition { name, label, icon?, stages?, blueprint?, displayField? }
+export interface StageDefinition  { name, label, initial?, final?, color? }
+export interface VocabularyDefinition { slug, name, codices, hierarchical, icon? }
+export interface FieldDefinition  { name, label, type: FieldType, required?, options?, fieldOptions?, queryable? }
+
+// Uso nello store
+const appStore = useAppStore()
+appStore.codices      // CodexDefinition[]
+appStore.vocabularies // VocabularyDefinition[]
+appStore.postTypes    // alias → appStore.codices (backward-compat)
+appStore.taxonomies   // alias → appStore.vocabularies (backward-compat)
+```
+
+## Router — route names aggiornate
+
+| Route name | Path | Descrizione |
+|---|---|---|
+| `folio-list` | `/folios/:codex` | Lista folii per codex |
+| `folio-new` | `/folios/:codex/new` | Nuovo folio |
+| `folio-edit` | `/folios/:codex/:id/edit` | Modifica folio |
+| `terms` | `/vocabulary/:slug` | Gestione terms |
 
 ## Router e navigazione
 

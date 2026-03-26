@@ -42,8 +42,8 @@ export default myPlugin
 ```ts
 {
   hooks,       // HookManager — addAction/addFilter/removeAction/removeFilter
-  postTypes,   // PostTypeRegistry — register(), get(), getAll(), getForPostType()
-  taxonomies,  // TaxonomyRegistry — register(), get(), getAll(), getForPostType()
+  codices,     // CodexRegistry — register(), get(), getAll()
+  vocabularies, // VocabularyRegistry — register(), get(), getAll(), getForCodex()
   db,          // Drizzle client (Db) — operazioni DB custom
   fastify,     // FastifyInstance — per registrare nuove route
   config,      // PhrasePressConfig — impostazioni globali
@@ -70,12 +70,12 @@ Non usare la migration di Drizzle per le tabelle dei plugin — usare `CREATE TA
   ```ts
   import { registerFieldGroup } from '../packages/plugins/fields/src/index.js'
   registerFieldGroup({
-    name:      'Product Details',
-    postTypes: ['product'],
-    fields:   [{ name: 'price', type: 'number', label: 'Price', queryable: true }],
+    name:    'Product Details',
+    codices: ['product'],
+    fields:  [{ name: 'price', type: 'number', label: 'Price', queryable: true }],
   })
   ```
-- I gruppi registrati via `registerFieldGroup` e quelli salvati nel DB vengono uniti al momento della richiesta `GET /post-types` tramite il filter hook `post_types.meta`.
+- I gruppi registrati via `registerFieldGroup` e quelli salvati nel DB vengono uniti al momento della richiesta `GET /api/v1/codices` tramite il filter hook `codices.meta`.
 
 ## Media plugin (`packages/plugins/media`)
 
