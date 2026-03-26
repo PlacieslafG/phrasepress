@@ -123,7 +123,7 @@
 </template>
 
 <script setup lang="ts">
-import type { FieldDefinition } from '@/api/posts.js'
+import type { FieldDefinition } from '@/stores/app.js'
 import RichTextEditor from './RichTextEditor.vue'
 
 export interface TranslationFormState {

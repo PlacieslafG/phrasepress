@@ -87,7 +87,7 @@ import RichTextEditor from './RichTextEditor.vue'
 import ImagePickerField from './ImagePickerField.vue'
 import RelationshipField from './RelationshipField.vue'
 import RepeaterField, { type SubFieldDef } from './RepeaterField.vue'
-import type { FieldDefinition } from '@/api/posts.js'
+import type { FieldDefinition } from '@/stores/app.js'
 
 const props = defineProps<{
   modelValue:  Record<string, unknown>

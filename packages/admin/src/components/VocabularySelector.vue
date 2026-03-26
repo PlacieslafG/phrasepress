@@ -2,7 +2,7 @@
   <div class="flex flex-col gap-1">
 
     <!-- Gerarchico: lista Checkbox PrimeVue con indentazione -->
-    <template v-if="taxonomy.hierarchical">
+    <template v-if="vocabulary.hierarchical">
       <div v-if="flatTree.length === 0" class="text-xs text-surface-400 py-1">
         Nessun termine
       </div>
@@ -16,10 +16,10 @@
           <Checkbox
             v-model="localIds"
             :value="item.id"
-            :input-id="`term-${taxonomy.slug}-${item.id}`"
+            :input-id="`term-${vocabulary.slug}-${item.id}`"
           />
           <label
-            :for="`term-${taxonomy.slug}-${item.id}`"
+            :for="`term-${vocabulary.slug}-${item.id}`"
             class="text-sm cursor-pointer select-none"
           >{{ item.name }}</label>
         </div>
@@ -44,11 +44,11 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
-import { taxonomiesApi } from '@/api/taxonomies.js'
-import type { TaxonomyDefinition, TermWithChildren } from '@/api/taxonomies.js'
+import { vocabulariesApi } from '@/api/vocabularies.js'
+import type { VocabularyDefinition, TermWithChildren } from '@/api/vocabularies.js'
 
 const props = defineProps<{
-  taxonomy:    TaxonomyDefinition
+  vocabulary:  VocabularyDefinition
   selectedIds: number[]
 }>()
 
@@ -79,7 +79,7 @@ const flatTerms = computed(() => flatten(allTerms.value).map(({ id, name }) => (
 
 onMounted(async () => {
   try {
-    allTerms.value = await taxonomiesApi.getTerms(props.taxonomy.slug)
-  } catch { /* taxonomy senza terms */ }
+    allTerms.value = await vocabulariesApi.getTerms(props.vocabulary.slug)
+  } catch { /* vocabulary senza terms */ }
 })
 </script>

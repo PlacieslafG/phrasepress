@@ -1,6 +1,6 @@
 <template>
   <div class="p-6 flex flex-col gap-6">
-    <h2 class="text-2xl font-semibold">{{ taxonomyDef?.name ?? route.params.slug }}</h2>
+    <h2 class="text-2xl font-semibold">{{ vocabularyDef?.name ?? route.params.slug }}</h2>
 
     <div class="grid grid-cols-[300px_1fr] gap-6 items-start">
       <!-- Form aggiunta/modifica -->
@@ -22,7 +22,7 @@
           <Textarea v-model="form.description" rows="3" class="w-full" />
         </div>
 
-        <div v-if="taxonomyDef?.hierarchical" class="flex flex-col gap-1">
+        <div v-if="vocabularyDef?.hierarchical" class="flex flex-col gap-1">
           <label class="text-sm font-medium">Genitore</label>
           <Select
             v-model="form.parentId"
@@ -94,8 +94,8 @@ import { useRoute } from 'vue-router'
 import { useConfirm } from 'primevue/useconfirm'
 import { useToast } from 'primevue/usetoast'
 import { useAppStore } from '@/stores/app.js'
-import { taxonomiesApi } from '@/api/taxonomies.js'
-import type { Term, TermWithChildren } from '@/api/taxonomies.js'
+import { vocabulariesApi } from '@/api/vocabularies.js'
+import type { Term, TermWithChildren } from '@/api/vocabularies.js'
 
 function generateSlug(v: string): string {
   return v.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '').replace(/-+/g, '-').replace(/^-|-$/g, '')
@@ -118,8 +118,8 @@ const form = ref({ name: '', slug: '', description: '', parentId: null as number
 
 let slugManuallyEdited = false
 
-const taxonomyDef = computed(() =>
-  appStore.taxonomies.find(t => t.slug === route.params.slug as string)
+const vocabularyDef = computed(() =>
+  appStore.vocabularies.find(v => v.slug === route.params.slug as string)
 )
 
 // Righe piatte con profondità per visualizzazione gerarchica
@@ -172,7 +172,7 @@ function onNameInput() {
 async function loadTerms() {
   loading.value = true
   try {
-    allTerms.value = await taxonomiesApi.getTerms(route.params.slug as string)
+    allTerms.value = await vocabulariesApi.getTerms(route.params.slug as string)
   } catch {
     toast.add({ severity: 'error', summary: 'Errore', detail: 'Impossibile caricare i terms', life: 3000 })
   } finally {
@@ -199,10 +199,10 @@ async function submitForm() {
     const slug = route.params.slug as string
     const payload = { name: form.value.name, slug: form.value.slug || undefined, description: form.value.description, parentId: form.value.parentId ?? undefined }
     if (editing.value) {
-      await taxonomiesApi.updateTerm(slug, editing.value.id, payload)
+      await vocabulariesApi.updateTerm(slug, editing.value.id, payload)
       toast.add({ severity: 'success', summary: 'Aggiornato', detail: 'Term aggiornato', life: 2000 })
     } else {
-      await taxonomiesApi.createTerm(slug, payload)
+      await vocabulariesApi.createTerm(slug, payload)
       toast.add({ severity: 'success', summary: 'Creato', detail: 'Term creato', life: 2000 })
     }
     resetForm()
@@ -224,7 +224,7 @@ function confirmDelete(term: FlatRow) {
     acceptClass:   'p-button-danger',
     accept: async () => {
       try {
-        await taxonomiesApi.deleteTerm(route.params.slug as string, term.id)
+        await vocabulariesApi.deleteTerm(route.params.slug as string, term.id)
         toast.add({ severity: 'success', summary: 'Eliminato', detail: 'Term eliminato', life: 2000 })
         if (editing.value?.id === term.id) resetForm()
         await loadTerms()

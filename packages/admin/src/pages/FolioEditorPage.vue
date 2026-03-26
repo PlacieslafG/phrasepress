@@ -7,7 +7,7 @@
       <!-- Breadcrumb + active locale badge -->
       <div class="flex flex-col min-w-0">
         <span class="text-sm text-surface-400 truncate">
-          {{ postType?.label ?? type }} /
+          {{ codex?.label ?? type }} /
           <span class="text-surface-600">{{ isNew ? 'Nuovo' : form.title || '…' }}</span>
         </span>
         <span v-if="activeLocale !== null" class="flex items-center gap-1 text-xs font-semibold text-primary-500 mt-0.5">
@@ -142,28 +142,28 @@
 
           <Panel header="Status" toggleable>
             <div class="flex flex-col gap-2">
-              <div v-for="opt in statusOptions" :key="opt.value" class="flex items-center gap-2">
-                <RadioButton v-model="form.status" :value="opt.value" :input-id="`status-${opt.value}`" />
-                <label :for="`status-${opt.value}`" class="text-sm cursor-pointer">{{ opt.label }}</label>
+          <div v-for="opt in stageOptions" :key="opt.name" class="flex items-center gap-2">
+                <RadioButton v-model="form.stage" :value="opt.name" :input-id="`stage-${opt.name}`" />
+                <label :for="`stage-${opt.name}`" class="text-sm cursor-pointer">{{ opt.label }}</label>
               </div>
             </div>
           </Panel>
 
           <Panel
-            v-for="tax in relatedTaxonomies"
-            :key="tax.slug"
-            :header="tax.name"
+            v-for="voc in relatedVocabularies"
+            :key="voc.slug"
+            :header="voc.name"
             toggleable
           >
-            <TaxonomySelector
-              :taxonomy="tax"
-              :selected-ids="form.termIds[tax.slug] ?? []"
-              @update:selected-ids="form.termIds[tax.slug] = $event"
+            <VocabularySelector
+              :vocabulary="voc"
+              :selected-ids="form.termIds[voc.slug] ?? []"
+              @update:selected-ids="form.termIds[voc.slug] = $event"
             />
           </Panel>
 
           <Panel v-if="!isNew" header="Revisioni" toggleable>
-            <RevisionsPanel ref="revPanelRef" :post-id="postId!" @restored="onRestored" />
+            <RevisionsPanel ref="revPanelRef" :codex="type" :post-id="postId!" @restored="onRestored" />
           </Panel>
         </aside>
       </template>
@@ -177,7 +177,7 @@
             <span>
               Stai modificando la traduzione in
               <strong>{{ currentLocaleLabel }}</strong>.
-              Le tassonomie e le revisioni sono gestite nella scheda
+              I vocabolari e le revisioni sono gestiti nella scheda
               <button class="underline font-semibold" @click="activeLocale = null">{{ defaultLocale?.label ?? 'lingua base' }}</button>.
             </span>
           </div>
@@ -201,8 +201,8 @@ import { ref, computed, watch, watchEffect, onMounted, onUnmounted } from 'vue'
 import { useI18nJobsStore } from '@/stores/i18nJobs.js'
 import { useRoute, useRouter } from 'vue-router'
 import { useAppStore } from '@/stores/app.js'
-import { postsApi } from '@/api/posts.js'
-import type { FieldDefinition } from '@/api/posts.js'
+import { foliosApi } from '@/api/folios.js'
+import type { FieldDefinition } from '@/stores/app.js'
 import { useToast } from 'primevue/usetoast'
 import { useConfirm } from 'primevue/useconfirm'
 import { i18nApi } from '@/api/i18n.js'
@@ -210,7 +210,7 @@ import type { Locale, Translation } from '@/api/i18n.js'
 import TitleInput        from '@/components/TitleInput.vue'
 import RichTextEditor    from '@/components/RichTextEditor.vue'
 import CustomFieldsPanel from '@/components/CustomFieldsPanel.vue'
-import TaxonomySelector  from '@/components/TaxonomySelector.vue'
+import VocabularySelector from '@/components/VocabularySelector.vue'
 import RevisionsPanel    from '@/components/RevisionsPanel.vue'
 import TranslationEditor from '@/components/TranslationEditor.vue'
 
@@ -221,27 +221,33 @@ const jobStore  = useI18nJobsStore()
 const toast   = useToast()
 const confirm = useConfirm()
 
-const type    = computed(() => route.params.type as string)
+const type    = computed(() => route.params.codex as string)
 const isNew   = computed(() => route.params.id === undefined)
 const postId  = computed(() => isNew.value ? null : Number(route.params.id))
 
-const postType = computed(() => appStore.postTypes.find((p) => p.name === type.value))
-const fieldDefs = computed<FieldDefinition[]>(() => postType.value?.fields ?? [])
+const codex     = computed(() => appStore.codices.find((c) => c.name === type.value))
+const fieldDefs = computed<FieldDefinition[]>(() => {
+  const INLINE = new Set(['title', 'slug', 'content'])
+  return (codex.value?.blueprint ?? []).filter(f => !INLINE.has(f.name))
+})
 
-const relatedTaxonomies = computed(() =>
-  appStore.taxonomies.filter((t) => t.postTypes.includes(type.value))
+const relatedVocabularies = computed(() =>
+  appStore.vocabularies.filter((v) => v.codices.includes(type.value))
 )
 
-const statusOptions = [
-  { label: 'Bozza',      value: 'draft' },
-  { label: 'Pubblicato', value: 'published' },
-]
+const stageOptions = computed(() => {
+  const stages = codex.value?.stages ?? [
+    { name: 'draft', label: 'Bozza' },
+    { name: 'published', label: 'Pubblicato' },
+  ]
+  return stages.filter(s => !s.final)
+})
 
 interface FormState {
   title:   string
   slug:    string
   content: string
-  status:  'draft' | 'published'
+  stage:   string
   fields:  Record<string, unknown>
   termIds: Record<string, number[]>
 }
@@ -250,7 +256,7 @@ const form = ref<FormState>({
   title:   '',
   slug:    '',
   content: '',
-  status:  'draft',
+  stage:   'draft',
   fields:  {},
   termIds: {},
 })
@@ -263,19 +269,20 @@ const revPanelRef = ref<InstanceType<typeof RevisionsPanel> | null>(null)
 async function loadPost() {
   if (isNew.value || !postId.value) return
   try {
-    const post = await postsApi.get(postId.value)
+    const folio = await foliosApi.get(type.value, postId.value)
+    const f     = folio.fields as Record<string, unknown>
     form.value = {
-      title:   post.title,
-      slug:    post.slug,
-      content: post.content ?? '',
-      status:  post.status as 'draft' | 'published',
-      fields:  post.fields ?? {},
+      title:   String(f.title   ?? ''),
+      slug:    String(f.slug    ?? ''),
+      content: String(f.content ?? ''),
+      stage:   folio.stage,
+      fields:  Object.fromEntries(Object.entries(f).filter(([k]) => !['title','slug','content'].includes(k))),
       termIds: Object.fromEntries(
         Object.entries(
-          post.terms.reduce((acc, t) => {
-            const arr = acc[t.taxonomySlug] ?? []
+          folio.terms.reduce((acc, t) => {
+            const arr = acc[t.vocabularySlug] ?? []
             arr.push(t.termId)
-            return { ...acc, [t.taxonomySlug]: arr }
+            return { ...acc, [t.vocabularySlug]: arr }
           }, {} as Record<string, number[]>)
         )
       ),
@@ -288,24 +295,26 @@ async function loadPost() {
 async function save(status: 'draft' | 'published') {
   saving.value  = true
   errorMsg.value = ''
-  form.value.status = status
+  form.value.stage = status
 
   try {
     const payload = {
-      title:   form.value.title,
-      slug:    form.value.slug || undefined,
-      content: form.value.content,
-      status:  form.value.status,
-      fields:  form.value.fields,
+      fields: {
+        title:   form.value.title,
+        slug:    form.value.slug || undefined,
+        content: form.value.content,
+        ...form.value.fields,
+      },
+      stage:   form.value.stage,
       termIds: Object.values(form.value.termIds).flat(),
     }
 
     if (isNew.value) {
-      const created = await postsApi.create({ ...payload, postType: type.value })
-      toast.add({ severity: 'success', summary: 'Post creato', life: 2000 })
-      router.replace(`/posts/${type.value}/${created.id}/edit`)
+      const created = await foliosApi.create(type.value, payload)
+      toast.add({ severity: 'success', summary: 'Creato', life: 2000 })
+      router.replace(`/folios/${type.value}/${created.id}/edit`)
     } else {
-      await postsApi.update(postId.value!, payload)
+      await foliosApi.update(type.value, postId.value!, payload)
       toast.add({ severity: 'success', summary: 'Salvato', life: 2000 })
       revPanelRef.value?.reload()
     }
@@ -337,7 +346,7 @@ onUnmounted(() => {
 
 // Se l'utente naviga a un altro post type senza uscire dalla pagina
 watch(() => route.params, () => {
-  form.value = { title: '', slug: '', content: '', status: 'draft', fields: {}, termIds: {} }
+  form.value = { title: '', slug: '', content: '', stage: 'draft', fields: {}, termIds: {} }
   activeLocale.value = null
   locales.value = []
   translations.value = []

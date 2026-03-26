@@ -42,18 +42,18 @@
             </a>
           </RouterLink>
 
-          <template v-if="appStore.postTypes.length > 0 || authStore.hasCapability('upload_files')">
+          <template v-if="appStore.codices.length > 0 || authStore.hasCapability('upload_files')">
             <p class="text-xs font-semibold text-surface-400 uppercase px-3 pt-4 pb-1 tracking-wider">Contenuti</p>
             <RouterLink
-              v-for="pt in appStore.postTypes"
-              :key="pt.name"
-              :to="`/posts/${pt.name}`"
+              v-for="cx in appStore.codices"
+              :key="cx.name"
+              :to="`/folios/${cx.name}`"
               v-slot="{ navigate, isActive }"
               custom
             >
               <a @click="navigate" :class="navClass(isActive)">
-                <i :class="ptIcon(pt.icon) + ' text-sm shrink-0'" />
-                <span>{{ pt.label }}</span>
+                <i :class="ptIcon(cx.icon) + ' text-sm shrink-0'" />
+                <span>{{ cx.label }}</span>
               </a>
             </RouterLink>
             <RouterLink v-if="authStore.hasCapability('upload_files')" to="/media" v-slot="{ navigate, isActive }" custom>
@@ -64,18 +64,18 @@
             </RouterLink>
           </template>
 
-          <template v-if="appStore.taxonomies.length > 0">
-            <p class="text-xs font-semibold text-surface-400 uppercase px-3 pt-4 pb-1 tracking-wider">Tassonomie</p>
+          <template v-if="appStore.vocabularies.length > 0">
+            <p class="text-xs font-semibold text-surface-400 uppercase px-3 pt-4 pb-1 tracking-wider">Vocabolari</p>
             <RouterLink
-              v-for="tax in appStore.taxonomies"
-              :key="tax.slug"
-              :to="`/taxonomy/${tax.slug}`"
+              v-for="voc in appStore.vocabularies"
+              :key="voc.slug"
+              :to="`/vocabulary/${voc.slug}`"
               v-slot="{ navigate, isActive }"
               custom
             >
               <a @click="navigate" :class="navClass(isActive)">
                 <i class="pi pi-tags text-sm shrink-0" />
-                <span>{{ tax.name }}</span>
+                <span>{{ voc.name }}</span>
               </a>
             </RouterLink>
           </template>

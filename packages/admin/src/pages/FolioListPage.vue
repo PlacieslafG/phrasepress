@@ -2,8 +2,8 @@
   <div class="p-6 flex flex-col gap-4">
     <!-- Header -->
     <div class="flex items-center justify-between">
-      <h2 class="text-xl font-semibold">{{ postType?.label ?? route.params.type }}</h2>
-      <Button icon="pi pi-plus" :label="`Nuovo ${postType?.label ?? ''}`" @click="goNew" />
+      <h2 class="text-xl font-semibold">{{ codex?.label ?? route.params.codex }}</h2>
+      <Button icon="pi pi-plus" :label="`Nuovo ${codex?.label ?? ''}`" @click="goNew" />
     </div>
 
     <!-- Filtri -->
@@ -80,21 +80,21 @@
       striped-rows
       class="text-sm"
     >
-      <template #empty>Nessun post trovato.</template>
+      <template #empty>Nessun folio trovato.</template>
 
-      <Column field="title" header="Titolo" sortable>
+      <Column field="fields.title" header="Titolo" sortable>
         <template #body="{ data }">
           <span class="font-medium cursor-pointer hover:underline" @click="goEdit(data.id)">
-            {{ data.title }}
+            {{ data.fields?.title ?? '—' }}
           </span>
         </template>
       </Column>
 
-      <Column field="status" header="Stato" class="w-28">
+      <Column field="stage" header="Stato" class="w-28">
         <template #body="{ data }">
           <Tag
-            :value="data.status"
-            :severity="data.status === 'published' ? 'success' : data.status === 'trash' ? 'danger' : 'secondary'"
+            :value="data.stage"
+            :severity="data.stage === 'published' ? 'success' : data.stage === 'trash' ? 'danger' : 'secondary'"
           />
         </template>
       </Column>
@@ -116,27 +116,27 @@
           <div class="flex gap-1">
             <Button icon="pi pi-pencil" text rounded size="small" @click="goEdit(data.id)" />
             <Button
-              v-if="data.status === 'draft'"
+              v-if="data.stage === 'draft'"
               icon="pi pi-send" text rounded size="small" severity="success"
               v-tooltip="'Pubblica'"
-              @click="setStatus(data, 'published')"
+              @click="setStage(data, 'published')"
             />
             <Button
-              v-else-if="data.status === 'published'"
+              v-else-if="data.stage === 'published'"
               icon="pi pi-eye-slash" text rounded size="small" severity="secondary"
               v-tooltip="'Metti in bozza'"
-              @click="setStatus(data, 'draft')"
+              @click="setStage(data, 'draft')"
             />
             <Button
-              v-if="data.status !== 'trash'"
+              v-if="data.stage !== 'trash'"
               icon="pi pi-trash" text rounded size="small" severity="warn"
-              @click="trashPost(data)"
+              @click="trashFolio(data)"
             />
             <Button
               v-else
               icon="pi pi-times-circle" text rounded size="small" severity="danger"
               v-tooltip="'Elimina definitivamente'"
-              @click="deletePost(data)"
+              @click="deleteFolio(data)"
             />
           </div>
         </template>
@@ -149,8 +149,8 @@
 import { ref, computed, watch, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAppStore } from '@/stores/app.js'
-import { postsApi } from '@/api/posts.js'
-import type { Post } from '@/api/posts.js'
+import { foliosApi } from '@/api/folios.js'
+import type { Folio } from '@/api/folios.js'
 import { usersApi } from '@/api/users.js'
 import type { UserListItem } from '@/api/users.js'
 import { useToast } from 'primevue/usetoast'
@@ -160,10 +160,10 @@ const router   = useRouter()
 const appStore = useAppStore()
 const toast    = useToast()
 
-const type     = computed(() => route.params.type as string)
-const postType = computed(() => appStore.postTypes.find((p) => p.name === type.value))
+const type  = computed(() => route.params.codex as string)
+const codex = computed(() => appStore.codices.find((c) => c.name === type.value))
 
-const posts   = ref<Post[]>([])
+const posts   = ref<Folio[]>([])
 const total   = ref(0)
 const loading = ref(false)
 const page    = ref(1)
@@ -207,10 +207,9 @@ async function loadList() {
   loading.value = true
   try {
     const params: Record<string, string | number> = {
-      type:  type.value,
       page:  page.value,
       limit: limit.value,
-      status: filterStatus.value ?? 'any',
+      stage: filterStatus.value ?? 'any',
     }
     if (filterSearch.value)   params['search']   = filterSearch.value
     if (filterAuthor.value)   params['authorId']  = filterAuthor.value
@@ -221,7 +220,7 @@ async function loadList() {
       params['order']   = sortOrder.value === 1 ? 'asc' : 'desc'
     }
 
-    const res = await postsApi.list(params as Parameters<typeof postsApi.list>[0])
+    const res = await foliosApi.list(type.value, params as Parameters<typeof foliosApi.list>[1])
     posts.value = res.data
     total.value = res.total
   } catch {
@@ -266,23 +265,23 @@ function resetFilters() {
   loadList()
 }
 
-function goNew()            { router.push(`/posts/${type.value}/new`) }
-function goEdit(id: number) { router.push(`/posts/${type.value}/${id}/edit`) }
+function goNew()            { router.push(`/folios/${type.value}/new`) }
+function goEdit(id: number) { router.push(`/folios/${type.value}/${id}/edit`) }
 
-async function setStatus(post: Post, status: 'published' | 'draft') {
+async function setStage(folio: Folio, stage: string) {
   try {
-    const updated = await postsApi.update(post.id, { status })
-    const idx = posts.value.findIndex(p => p.id === post.id)
+    const updated = await foliosApi.update(type.value, folio.id, { stage })
+    const idx = posts.value.findIndex(p => p.id === folio.id)
     if (idx !== -1) posts.value[idx] = updated
-    toast.add({ severity: 'success', summary: status === 'published' ? 'Pubblicato' : 'Messo in bozza', life: 2000 })
+    toast.add({ severity: 'success', summary: stage === 'published' ? 'Pubblicato' : 'Messo in bozza', life: 2000 })
   } catch {
     toast.add({ severity: 'error', summary: 'Errore', detail: 'Impossibile cambiare stato', life: 3000 })
   }
 }
 
-async function trashPost(post: Post) {
+async function trashFolio(folio: Folio) {
   try {
-    await postsApi.delete(post.id)
+    await foliosApi.delete(type.value, folio.id)
     await loadList()
     toast.add({ severity: 'success', summary: 'Spostato nel cestino', life: 2000 })
   } catch {
@@ -290,9 +289,9 @@ async function trashPost(post: Post) {
   }
 }
 
-async function deletePost(post: Post) {
+async function deleteFolio(folio: Folio) {
   try {
-    await postsApi.delete(post.id, true)
+    await foliosApi.delete(type.value, folio.id, true)
     await loadList()
     toast.add({ severity: 'success', summary: 'Eliminato', life: 2000 })
   } catch {

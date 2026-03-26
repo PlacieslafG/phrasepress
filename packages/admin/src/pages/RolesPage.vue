@@ -207,18 +207,18 @@ const CAPABILITY_GROUPS: GroupDef[] = [
     icon:  'pi pi-file-edit',
     caps: [
       { key: 'read',                description: 'Visualizzare i contenuti pubblicati' },
-      { key: 'edit_posts',          description: 'Creare e modificare i propri post' },
-      { key: 'edit_others_posts',   description: 'Modificare post di altri utenti' },
-      { key: 'publish_posts',       description: 'Pubblicare e impostare la visibilità dei post' },
-      { key: 'delete_posts',        description: 'Eliminare i propri post' },
-      { key: 'delete_others_posts', description: 'Eliminare post di altri utenti' },
+      { key: 'edit_posts',          description: 'Creare e modificare i propri folii' },
+      { key: 'edit_others_posts',   description: 'Modificare folii di altri utenti' },
+      { key: 'publish_posts',       description: 'Pubblicare e impostare la visibilità dei folii' },
+      { key: 'delete_posts',        description: 'Eliminare i propri folii' },
+      { key: 'delete_others_posts', description: 'Eliminare folii di altri utenti' },
     ],
   },
   {
-    label: 'Tassonomie',
+    label: 'Vocabolari',
     icon:  'pi pi-tags',
     caps: [
-      { key: 'manage_terms', description: 'Creare, modificare ed eliminare categorie e tag' },
+      { key: 'manage_terms', description: 'Gestire i termini dei vocabolari' },
     ],
   },
   {

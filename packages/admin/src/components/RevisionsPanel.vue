@@ -38,19 +38,19 @@
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
-import { postsApi } from '@/api/posts.js'
-import type { PostRevision } from '@/api/posts.js'
+import { foliosApi } from '@/api/folios.js'
+import type { FolioRevision } from '@/api/folios.js'
 import { useToast } from 'primevue/usetoast'
 
-const props = defineProps<{ postId: number }>()
+const props = defineProps<{ codex: string; postId: number }>()
 const emit  = defineEmits<{ restored: [] }>()
 
 const toast    = useToast()
-const revisions = ref<PostRevision[]>([])
+const revisions = ref<FolioRevision[]>([])
 const loading   = ref(false)
 
 const showConfirm = ref(false)
-const pendingRev  = ref<PostRevision | null>(null)
+const pendingRev  = ref<FolioRevision | null>(null)
 
 function formatDate(ts: number) {
   return new Date(ts * 1000).toLocaleString('it-IT', {
@@ -62,7 +62,7 @@ function formatDate(ts: number) {
 async function load() {
   loading.value = true
   try {
-    revisions.value = await postsApi.getRevisions(props.postId)
+    revisions.value = await foliosApi.getRevisions(props.codex, props.postId)
   } catch {
     /* silenzioso */
   } finally {
@@ -79,7 +79,7 @@ async function doRestore() {
   if (!pendingRev.value) return
   showConfirm.value = false
   try {
-    await postsApi.restoreRevision(props.postId, pendingRev.value.id)
+    await foliosApi.restoreRevision(props.codex, props.postId, pendingRev.value.id)
     emit('restored')
     toast.add({ severity: 'success', summary: 'Revisione ripristinata', life: 2000 })
     await load()

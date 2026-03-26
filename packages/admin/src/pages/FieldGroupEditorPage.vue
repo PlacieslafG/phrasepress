@@ -24,10 +24,10 @@
             <InputText v-model="form.description" placeholder="Descrizione opzionale" />
           </div>
           <div class="flex flex-col gap-1">
-            <label class="text-sm font-medium">Post type associati</label>
+            <label class="text-sm font-medium">Codex associati</label>
             <MultiSelect
-              v-model="form.postTypes"
-              :options="postTypeOptions"
+              v-model="form.codices"
+              :options="codexOptions"
               option-label="label"
               option-value="name"
               placeholder="Seleziona post type..."
@@ -126,13 +126,13 @@
         <!-- Relationship config -->
         <div v-if="fieldForm.type === 'relationship'" class="flex flex-col gap-3">
           <div class="flex flex-col gap-1">
-            <label class="text-sm font-medium">Post type correlato</label>
+            <label class="text-sm font-medium">Codex correlato</label>
             <Select
-              v-model="relPostType"
-              :options="postTypeOptions"
+              v-model="relCodex"
+              :options="codexOptions"
               option-label="label"
               option-value="name"
-              placeholder="Seleziona post type..."
+              placeholder="Seleziona codex..."
             />
           </div>
           <div class="flex items-center gap-2">
@@ -232,10 +232,10 @@ const isNew   = computed(() => !groupId.value || groupId.value === 'new')
 const loading = ref(!isNew.value)
 const saving  = ref(false)
 
-const form = ref({ name: '', description: '', postTypes: [] as string[] })
+const form = ref({ name: '', description: '', codices: [] as string[] })
 const fields = ref<FieldItem[]>([])
 
-const postTypeOptions = computed(() => appStore.postTypes)
+const codexOptions = computed(() => appStore.codices)
 
 // ─── Field dialog ─────────────────────────────────────────────────────────────
 
@@ -245,7 +245,7 @@ const fieldForm = ref<FieldItemInput & { required: boolean; queryable: boolean; 
   name: '', label: '', type: 'string', required: false, queryable: false, translatable: true,
 })
 const selectOptionsText = ref('')
-const relPostType       = ref('')
+const relCodex          = ref('')
 const relMultiple       = ref(false)
 
 const SUB_FIELD_TYPES = [
@@ -280,13 +280,13 @@ function openFieldDialog(item?: FieldItem) {
       translatable: item.translatable !== false,
     }
     selectOptionsText.value = item.options?.join('\n') ?? ''
-    relPostType.value       = (item.fieldOptions?.postType as string) ?? ''
+    relCodex.value         = (item.fieldOptions?.postType as string) ?? ''
     relMultiple.value       = (item.fieldOptions?.multiple as boolean) ?? false
     subFields.value         = (item.fieldOptions?.subFields as { name: string; label: string; type: string }[]) ?? []
   } else {
     fieldForm.value = { name: '', label: '', type: 'string', required: false, queryable: false, translatable: true }
     selectOptionsText.value = ''
-    relPostType.value       = ''
+    relCodex.value         = ''
     relMultiple.value       = false
     subFields.value         = []
   }
@@ -319,7 +319,7 @@ async function saveField() {
     payload.options = selectOptionsText.value.split('\n').map(s => s.trim()).filter(Boolean)
   }
   if (fieldForm.value.type === 'relationship') {
-    payload.fieldOptions = { postType: relPostType.value, multiple: relMultiple.value }
+    payload.fieldOptions = { postType: relCodex.value, multiple: relMultiple.value }
   }
   if (fieldForm.value.type === 'repeater') {
     payload.fieldOptions = { subFields: subFields.value }
@@ -389,7 +389,7 @@ async function save() {
   }
   saving.value = true
   try {
-    const groupData = { name: form.value.name.trim(), description: form.value.description, postTypes: form.value.postTypes }
+    const groupData = { name: form.value.name.trim(), description: form.value.description, codices: form.value.codices }
 
     if (isNew.value) {
       const created = await createFieldGroup(groupData)
@@ -428,7 +428,7 @@ onMounted(async () => {
     const group = await getFieldGroup(groupId.value!)
     form.value.name        = group.name
     form.value.description = group.description
-    form.value.postTypes   = group.postTypes
+    form.value.codices   = group.codices
     fields.value           = group.fields
   } catch {
     toast.add({ severity: 'error', summary: 'Errore', detail: 'Impossibile caricare il gruppo', life: 3000 })

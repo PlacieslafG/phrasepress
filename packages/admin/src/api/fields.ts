@@ -19,7 +19,7 @@ export interface FieldGroup {
   id:          string
   name:        string
   description: string
-  postTypes:   string[]
+  codices:     string[]
   sortOrder:   number
   createdAt:   number
   fields:      FieldItem[]
@@ -28,7 +28,7 @@ export interface FieldGroup {
 export interface FieldGroupInput {
   name:         string
   description?: string
-  postTypes?:   string[]
+  codices?:     string[]
 }
 
 export interface FieldItemInput {

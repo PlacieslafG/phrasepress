@@ -32,17 +32,17 @@ import { apiFetch } from '@/api/client.js'
 
 const props = defineProps<{
   modelValue: number | number[] | null
-  postType:   string
+  postType:   string   // codex name (backward-compat prop name)
   multiple?:  boolean
 }>()
 
 const emit = defineEmits<{ 'update:modelValue': [value: number | number[] | null] }>()
 
-interface PostOption { id: number; title: string }
+interface FolioOption { id: number; title: string }
 
 const loading  = ref(false)
-const options  = ref<PostOption[]>([])
-const placeholder = computed(() => props.multiple ? 'Seleziona post...' : 'Seleziona un post...')
+const options  = ref<FolioOption[]>([])
+const placeholder = computed(() => props.multiple ? 'Seleziona...' : 'Seleziona...')
 
 const singleValue = computed(() => (props.multiple ? null : props.modelValue as number | null))
 const multiValue  = computed(() => (props.multiple ? (props.modelValue as number[] | null) ?? [] : []))
@@ -50,10 +50,10 @@ const multiValue  = computed(() => (props.multiple ? (props.modelValue as number
 onMounted(async () => {
   loading.value = true
   try {
-    const res = await apiFetch<{ data: { id: number; title: string }[] }>(
-      `/api/v1/posts?type=${encodeURIComponent(props.postType)}&limit=100&status=published`
+    const res = await apiFetch<{ data: Array<{ id: number; fields: Record<string, unknown> }> }>(
+      `/api/v1/${encodeURIComponent(props.postType)}?stage=published&limit=100`
     )
-    options.value = res.data.map(p => ({ id: p.id, title: p.title }))
+    options.value = res.data.map(f => ({ id: f.id, title: String(f.fields?.title ?? f.id) }))
   } catch {
     options.value = []
   } finally {

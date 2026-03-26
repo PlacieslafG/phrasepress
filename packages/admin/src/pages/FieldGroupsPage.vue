@@ -25,14 +25,14 @@
           <p v-if="group.description" class="text-sm text-surface-400 mt-0.5">{{ group.description }}</p>
           <div class="flex flex-wrap gap-1.5 mt-2">
             <Tag
-              v-for="pt in group.postTypes"
+              v-for="pt in group.codices"
               :key="pt"
-              :value="ptLabel(pt)"
+              :value="codexLabel(pt)"
               severity="secondary"
               class="text-xs"
             />
-            <span v-if="group.postTypes.length === 0" class="text-xs text-surface-400 italic">
-              Nessun post type associato
+            <span v-if="group.codices.length === 0" class="text-xs text-surface-400 italic">
+              Nessun codex associato
             </span>
           </div>
         </div>
@@ -70,8 +70,8 @@ const appStore = useAppStore()
 const loading = ref(true)
 const groups  = ref<FieldGroup[]>([])
 
-function ptLabel(name: string): string {
-  return appStore.postTypes.find(pt => pt.name === name)?.label ?? name
+function codexLabel(name: string): string {
+  return appStore.codices.find(c => c.name === name)?.label ?? name
 }
 
 onMounted(async () => {
