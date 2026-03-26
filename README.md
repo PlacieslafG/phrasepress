@@ -4,10 +4,10 @@ CMS headless minimalista ispirato a WordPress, scritto interamente in **Node.js 
 
 ## Caratteristiche
 
-- **Custom post types** con campi personalizzati e query indicizzate
-- **Custom taxonomies** gerarchiche o piatte, associabili a qualunque post type
-- **Plugin system** con hook (actions + filters) stile WordPress
-- **Revisioni dei post** con ripristino da admin
+- **Codici configurabili (Codices)** con blueprint di campi custom e workflow personalizzabili
+- **Vocabolari (Vocabularies)** gerarchici o piatti, associabili a qualunque codex
+- **Plugin system** con hook (actions + filters) stile WordPress, con auto-restart del server
+- **Revisioni dei folios** con ripristino da admin
 - **Sistema di ruoli e capabilities** granulare
 - **Admin SPA** in Vue 3 con editor rich text (Tiptap)
 - **API REST headless** — il frontend pubblico può essere qualunque cosa (Next.js, Astro, ecc.)
@@ -31,10 +31,10 @@ CMS headless minimalista ispirato a WordPress, scritto interamente in **Node.js 
 ```
 phrasepress/
 ├── packages/
-│   ├── core/          # Kernel: DB, hooks, post types, taxonomies, API Fastify
+│   ├── core/          # Kernel: DB, hooks, codices, vocabularies, API Fastify
 │   └── admin/         # SPA Vue 3 (Vite)
 ├── config/
-│   └── phrasepress.config.ts   # Entry point utente: post types, taxonomies, plugin
+│   └── phrasepress.config.ts   # Entry point utente: codices, vocabularies, plugin
 ├── deploy/
 │   └── nginx.conf.template
 ├── Dockerfile
@@ -127,25 +127,25 @@ node -e "console.log(require('crypto').randomBytes(48).toString('hex'))"
 
 ## Configurazione
 
-Modifica `config/phrasepress.config.ts` per registrare custom post types, taxonomies e plugin:
+Modifica `config/phrasepress.config.ts` per registrare codici, vocabularies e plugin:
 
 ```ts
 import { defineConfig } from '@phrasepress/core'
 
 export default defineConfig({
-  postTypes: [
+  codices: [
     {
       name: 'product',
       label: 'Products',
       icon: 'pi-shopping-cart',
-      fields: [
+      blueprint: [
         { name: 'price', type: 'number', label: 'Prezzo', queryable: true },
         { name: 'sku',   type: 'string', label: 'SKU',    queryable: true },
       ],
     },
   ],
-  taxonomies: [
-    { slug: 'brand', name: 'Brands', postTypes: ['product'], hierarchical: false },
+  vocabularies: [
+    { slug: 'brand', name: 'Brands', codices: ['product'], hierarchical: false },
   ],
   plugins: [],
 })
@@ -155,29 +155,27 @@ export default defineConfig({
 
 Base URL: `/api/v1`
 
-### Post
+### Folios (per ogni codex)
 
 | Metodo | Endpoint | Descrizione |
 |---|---|---|
-| `GET` | `/posts` | Lista post (filtri: `postType`, `status`, `search`, `page`, `limit`) |
-| `GET` | `/posts/:id` | Singolo post per ID |
-| `POST` | `/posts` | Crea post |
-| `PUT` | `/posts/:id` | Aggiorna post (crea revisione automaticamente) |
-| `DELETE` | `/posts/:id` | Elimina post |
-| `GET` | `/posts/:id/revisions` | Lista revisioni |
-| `POST` | `/posts/:id/revisions/:revId/restore` | Ripristina revisione |
+| `GET` | `/:codex` | Lista folios (filtri: `stage`, `search`, `page`, `perPage`, `termSlug`, `fieldName[op]`) |
+| `GET` | `/:codex/:id` | Singolo folio per ID (include terms per vocabulary) |
+| `POST` | `/:codex` | Crea folio |
+| `PUT` | `/:codex/:id` | Aggiorna folio (crea revisione automaticamente) |
+| `DELETE` | `/:codex/:id` | Elimina folio |
+| `GET` | `/:codex/:id/revisions` | Lista revisioni |
+| `POST` | `/:codex/:id/revisions/:revId/restore` | Ripristina revisione |
 
-### Taxonomies e Terms
+### Vocabularies e Terms
 
 | Metodo | Endpoint | Descrizione |
 |---|---|---|
-| `GET` | `/taxonomies` | Lista tassonomie registrate |
-| `GET` | `/taxonomies/:slug/terms` | Lista terms di una tassonomia |
-| `POST` | `/taxonomies/:slug/terms` | Crea term |
-| `PUT` | `/taxonomies/:slug/terms/:id` | Aggiorna term |
-| `DELETE` | `/taxonomies/:slug/terms/:id` | Elimina term |
-| `GET` | `/posts/:id/terms` | Terms associati a un post |
-| `PUT` | `/posts/:id/terms` | Imposta terms di un post |
+| `GET` | `/vocabularies` | Lista vocabularies registrati |
+| `GET` | `/vocabularies/:slug/terms` | Lista terms di un vocabulary |
+| `POST` | `/vocabularies/:slug/terms` | Crea term |
+| `PUT` | `/vocabularies/:slug/terms/:id` | Aggiorna term |
+| `DELETE` | `/vocabularies/:slug/terms/:id` | Elimina term |
 
 ### Auth
 
@@ -218,8 +216,8 @@ const myPlugin: Plugin = {
   name: 'my-plugin',
   async register(ctx) {
     // Aggiunge un hook action
-    ctx.hooks.addAction('post.saved', async (post) => {
-      console.log('Post salvato:', post.title)
+    ctx.hooks.addAction('folio.saved', async (folio) => {
+      console.log('Folio salvato:', folio.id)
     })
 
     // Registra un endpoint Fastify personalizzato
@@ -248,14 +246,14 @@ export default defineConfig({
 |---|---|
 | Setup monorepo, tsconfig, pnpm | [docs/01-setup.md](docs/01-setup.md) |
 | Schema Drizzle, migration, seed | [docs/02-database.md](docs/02-database.md) |
-| Post types, slug, CRUD, revisioni | [docs/03-post-types.md](docs/03-post-types.md) |
-| Taxonomies, terms, associazioni | [docs/04-taxonomies.md](docs/04-taxonomies.md) |
+| Codices, slug, CRUD folios, revisioni | [docs/03-codices.md](docs/03-codices.md) |
+| Vocabularies, terms, associazioni | [docs/04-vocabularies.md](docs/04-vocabularies.md) |
 | Hook system (actions + filters) | [docs/05-hooks.md](docs/05-hooks.md) |
 | Plugin loader, interfaccia Plugin | [docs/06-plugins.md](docs/06-plugins.md) |
 | Auth JWT, utenti, ruoli, capabilities | [docs/07-auth.md](docs/07-auth.md) |
 | Admin shell: Vue Router, Pinia, API client | [docs/08-admin-shell.md](docs/08-admin-shell.md) |
-| Admin: lista post, editor, Tiptap, revisioni | [docs/09-admin-posts.md](docs/09-admin-posts.md) |
-| Admin: gestione terms taxonomy | [docs/10-admin-taxonomies.md](docs/10-admin-taxonomies.md) |
+| Admin: lista folios, editor, Tiptap, revisioni | [docs/09-admin-folios.md](docs/09-admin-folios.md) |
+| Admin: gestione terms vocabulary | [docs/10-admin-vocabularies.md](docs/10-admin-vocabularies.md) |
 | Admin: utenti e ruoli | [docs/11-admin-users.md](docs/11-admin-users.md) |
 | Admin: pagina plugin | [docs/12-admin-plugins.md](docs/12-admin-plugins.md) |
 | Deploy: Dockerfile, pm2, Nginx, install.sh | [docs/13-deploy.md](docs/13-deploy.md) |

@@ -5,7 +5,7 @@ description: "Use when working on the Admin UI: Vue 3 components, pages, layouts
 
 # Istruzioni — Admin UI (Vue 3 + PrimeVue)
 
-**Documentazione di riferimento:** `docs/08-admin-shell.md`, `docs/09-admin-posts.md`, `docs/10-admin-taxonomies.md`, `docs/11-admin-users.md`, `docs/12-admin-plugins.md`
+**Documentazione di riferimento:** `docs/08-admin-shell.md`, `docs/09-admin-folios.md`, `docs/10-admin-vocabularies.md`, `docs/11-admin-users.md`, `docs/12-admin-plugins.md`
 
 ## Setup e convenzioni Vue 3
 

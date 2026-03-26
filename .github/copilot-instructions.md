@@ -134,14 +134,14 @@ Ad ogni `PUT /:codex/:id` creare una riga in `post_revisions` PRIMA di aggiornar
 |---|---|
 | Setup monorepo, tsconfig, pnpm | `docs/01-setup.md` |
 | Schema Drizzle, migration, seed | `docs/02-database.md` |
-| Post types, slug, CRUD posts, revisioni | `docs/03-post-types.md` |
-| Taxonomies, terms, associazioni | `docs/04-taxonomies.md` |
+| Codices, slug, CRUD folios, revisioni | `docs/03-codices.md` |
+| Vocabularies, terms, associazioni | `docs/04-vocabularies.md` |
 | Hook system (actions + filters) | `docs/05-hooks.md` |
 | Plugin loader, interfaccia Plugin | `docs/06-plugins.md` |
 | Auth JWT, utenti, ruoli, capabilities | `docs/07-auth.md` |
 | Admin shell: Vue Router, Pinia, API client | `docs/08-admin-shell.md` |
-| Admin: lista post, editor, Tiptap, revisioni | `docs/09-admin-posts.md` |
-| Admin: gestione terms taxonomy | `docs/10-admin-taxonomies.md` |
+| Admin: lista folios, editor, Tiptap, revisioni | `docs/09-admin-folios.md` |
+| Admin: gestione terms vocabulary | `docs/10-admin-vocabularies.md` |
 | Admin: utenti e ruoli | `docs/11-admin-users.md` |
 | Admin: pagina plugin | `docs/12-admin-plugins.md` |
 | Deploy: Dockerfile, pm2, Nginx, install.sh | `docs/13-deploy.md` |

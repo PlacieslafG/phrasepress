@@ -5,7 +5,7 @@ description: "Use when working on phrasepress.config.ts, defining custom codex t
 
 # Istruzioni — Configurazione utente (`phrasepress.config.ts`)
 
-**Documentazione di riferimento:** `docs/03-post-types.md`, `docs/04-taxonomies.md`, `docs/06-plugins.md`
+**Documentazione di riferimento:** `docs/03-codices.md`, `docs/04-vocabularies.md`, `docs/06-plugins.md`
 
 ## Struttura base
 

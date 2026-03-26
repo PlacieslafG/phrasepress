@@ -29,12 +29,12 @@ Oggetto passato a tutti i lifecycle hooks del plugin. Contiene tutto il necessar
 
 ```ts
 interface PluginContext {
-  hooks:      HookManager        // aggiungi actions e filters
-  postTypes:  PostTypeRegistry   // registra custom post types
-  taxonomies: TaxonomyRegistry   // registra custom taxonomies
-  db:         Db                 // accesso diretto a better-sqlite3 + Drizzle
-  fastify:    FastifyInstance    // monta nuove route
-  config:     PhrasePressConfig  // config utente
+  hooks:        IHookManager       // aggiungi actions e filters
+  codices:      CodexRegistry      // registra codici (custom post types)
+  vocabularies: VocabularyRegistry // registra vocabolari (custom taxonomies)
+  db:           Db                 // accesso diretto a better-sqlite3 + Drizzle
+  fastify:      FastifyInstance    // monta nuove route
+  config:       PhrasePressConfig  // config utente
 }
 ```
 

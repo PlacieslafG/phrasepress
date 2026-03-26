@@ -5,7 +5,7 @@ description: "Use when writing or modifying Fastify API routes: REST endpoints, 
 
 # Istruzioni — API Routes (Fastify)
 
-**Documentazione di riferimento:** `docs/03-post-types.md`, `docs/04-taxonomies.md`, `docs/07-auth.md`
+**Documentazione di riferimento:** `docs/03-codices.md`, `docs/04-vocabularies.md`, `docs/07-auth.md`
 
 ## Struttura route
 

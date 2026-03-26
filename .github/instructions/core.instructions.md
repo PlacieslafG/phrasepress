@@ -5,7 +5,7 @@ description: "Use when working on the core Node.js TypeScript package: ESM impor
 
 # Istruzioni — Core TypeScript (Node.js)
 
-**Documentazione di riferimento:** `docs/01-setup.md`, `docs/03-post-types.md`
+**Documentazione di riferimento:** `docs/01-setup.md`, `docs/03-codices.md`
 
 ## Terminologia fondamentale
 

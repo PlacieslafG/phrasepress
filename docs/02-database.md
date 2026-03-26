@@ -30,54 +30,65 @@ Ruoli utente con capabilities JSON.
 | `role_id` | INTEGER FK → `roles.id` | |
 | `created_at` | INTEGER NOT NULL | Unix timestamp |
 
-### `posts`
+### `folios`
+
+Ogni Folio è un'istanza di un Codex. Tutti i dati del contenuto (titolo, slug, content, campi custom) sono nel blob JSON `fields`.
 
 | Colonna | Tipo | Note |
 |---|---|---|
 | `id` | INTEGER PK autoincrement | |
-| `post_type` | TEXT NOT NULL | Es. `post`, `page`, custom |
-| `title` | TEXT NOT NULL | |
-| `slug` | TEXT NOT NULL | |
-| `content` | TEXT NOT NULL DEFAULT `''` | HTML da Tiptap |
-| `fields` | TEXT NOT NULL DEFAULT `'{}'` | JSON blob custom fields |
-| `status` | TEXT NOT NULL DEFAULT `'draft'` | `draft`, `published`, `trash` |
+| `codex` | TEXT NOT NULL | Nome del codex, es. `post`, `page`, custom |
+| `stage` | TEXT NOT NULL DEFAULT `'draft'` | Fase del workflow, es. `draft`, `published`, `trash` |
+| `fields` | TEXT NOT NULL DEFAULT `'{}'` | JSON blob: title, slug, content + campi custom |
 | `author_id` | INTEGER FK → `users.id` | |
 | `created_at` | INTEGER NOT NULL | Unix timestamp |
 | `updated_at` | INTEGER NOT NULL | Unix timestamp |
 
-**Indici:** UNIQUE su `(post_type, slug)`
+**Indici:** `(codex, stage)`, `(codex, created_at)`
 
-### `post_field_index`
+> **Nota:** non ci sono colonne separate per `title`, `slug`, `content`. Sono tutti campi nel blob `fields`. Questo consente blueprint completamente arbitrari per ogni Codex.
 
-Indice per query veloci su custom fields con `queryable: true`. Aggiornato ad ogni salvataggio del post (DELETE + INSERT per il post).
+### `folio_field_index`
+
+Indice per query filtrate veloci su campi con `queryable: true`. Aggiornato ad ogni salvataggio del folio (DELETE + INSERT per il folio).
 
 | Colonna | Tipo | Note |
 |---|---|---|
 | `id` | INTEGER PK autoincrement | |
-| `post_id` | INTEGER FK → `posts.id` ON DELETE CASCADE | |
+| `folio_id` | INTEGER FK → `folios.id` ON DELETE CASCADE | |
 | `field_name` | TEXT NOT NULL | |
 | `string_value` | TEXT | Per campi di tipo string, select, date |
 | `number_value` | REAL | Per campi di tipo number |
 
-**Indici:** `(field_name, string_value)`, `(field_name, number_value)`, `(post_id)`
+**Indici:** `(field_name, string_value)`, `(field_name, number_value)`, `(folio_id)`
 
-### `post_revisions`
+### `folio_revisions`
 
-Snapshot del post creato automaticamente **prima** di ogni aggiornamento tramite `PUT /posts/:id`.
+Snapshot del folio creato automaticamente **prima** di ogni aggiornamento tramite `PUT /:codex/:id`.
 
 | Colonna | Tipo | Note |
 |---|---|---|
 | `id` | INTEGER PK autoincrement | |
-| `post_id` | INTEGER FK → `posts.id` ON DELETE CASCADE | |
-| `title` | TEXT NOT NULL | |
-| `slug` | TEXT NOT NULL | |
-| `content` | TEXT NOT NULL | |
-| `fields` | TEXT NOT NULL | JSON snapshot |
-| `status` | TEXT NOT NULL | |
+| `folio_id` | INTEGER FK → `folios.id` ON DELETE CASCADE | |
+| `stage` | TEXT NOT NULL | |
+| `fields` | TEXT NOT NULL | JSON snapshot completo dei fields |
 | `author_id` | INTEGER FK → `users.id` | |
 | `created_at` | INTEGER NOT NULL | Unix timestamp |
 
-### `taxonomies`
+### `folio_links`
+
+Relazioni tipizzate tra folios (rimpiazza il tipo di campo `relationship` nel blob JSON).
+
+| Colonna | Tipo | Note |
+|---|---|---|
+| `id` | INTEGER PK autoincrement | |
+| `from_folio_id` | INTEGER FK → `folios.id` ON DELETE CASCADE | |
+| `from_field` | TEXT NOT NULL | Nome del campo Link nel Blueprint |
+| `to_folio_id` | INTEGER FK → `folios.id` ON DELETE CASCADE | |
+| `to_codex` | TEXT NOT NULL | Denormalizzato per query senza JOIN |
+| `sort_order` | INTEGER NOT NULL DEFAULT `0` | |
+
+### `vocabularies`
 
 | Colonna | Tipo | Note |
 |---|---|---|
@@ -91,24 +102,24 @@ Snapshot del post creato automaticamente **prima** di ogni aggiornamento tramite
 | Colonna | Tipo | Note |
 |---|---|---|
 | `id` | INTEGER PK autoincrement | |
-| `taxonomy_id` | INTEGER FK → `taxonomies.id` ON DELETE CASCADE | |
+| `vocabulary_id` | INTEGER FK → `vocabularies.id` ON DELETE CASCADE | |
 | `name` | TEXT NOT NULL | |
 | `slug` | TEXT NOT NULL | |
 | `description` | TEXT NOT NULL DEFAULT `''` | |
 | `parent_id` | INTEGER FK → `terms.id` (self-referential) | Null per root |
 
-**Indici:** UNIQUE su `(taxonomy_id, slug)`
+**Indici:** UNIQUE su `(vocabulary_id, slug)`
 
-### `post_terms`
+### `folio_terms`
 
-Tabella di associazione N:M tra post e terms. Nessuna colonna extra.
+Tabella di associazione N:M tra folios e terms. Nessuna colonna extra.
 
 | Colonna | Tipo |
 |---|---|
-| `post_id` | INTEGER FK → `posts.id` ON DELETE CASCADE |
+| `folio_id` | INTEGER FK → `folios.id` ON DELETE CASCADE |
 | `term_id` | INTEGER FK → `terms.id` ON DELETE CASCADE |
 
-**PK:** `(post_id, term_id)`
+**PK:** `(folio_id, term_id)`
 
 ### `plugin_status`
 
