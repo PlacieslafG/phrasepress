@@ -1,6 +1,17 @@
+import { writeFileSync } from 'node:fs'
+import { join, dirname } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import type { FastifyPluginAsync } from 'fastify'
 import type { PluginLoader } from '../plugins/PluginLoader.js'
 import '../types.js'
+
+const __dirname = dirname(fileURLToPath(import.meta.url))
+
+// Scrive un file in src/ per triggerare il restart di nodemon tramite file-watch
+function triggerRestart(): void {
+  const triggerFile = join(__dirname, '.restart-trigger.ts')
+  writeFileSync(triggerFile, `// restart trigger — auto-generated\nexport const t = ${Date.now()}\n`)
+}
 
 interface PluginsRouteOptions {
   loader: PluginLoader
@@ -33,7 +44,10 @@ const pluginsRoutes: FastifyPluginAsync<PluginsRouteOptions> = async (fastify, o
       const message = err instanceof Error ? err.message : 'Unknown error'
       return reply.status(422).send({ error: message })
     }
-    return { success: true, requiresRestart: true }
+    // Invia la risposta, poi triggera il restart di nodemon via file-watch
+    reply.send({ success: true, restarting: true })
+    setTimeout(triggerRestart, 300)
+    return reply
   })
 
   // ── POST /plugins/:name/deactivate ────────────────────────────────────────────
@@ -53,8 +67,10 @@ const pluginsRoutes: FastifyPluginAsync<PluginsRouteOptions> = async (fastify, o
       const message = err instanceof Error ? err.message : 'Unknown error'
       return reply.status(422).send({ error: message })
     }
-    // La deattivazione richiede restart per rimuovere hook/post type già registrati
-    return { success: true, requiresRestart: true }
+    // Invia la risposta, poi triggera il restart di nodemon via file-watch
+    reply.send({ success: true, restarting: true })
+    setTimeout(triggerRestart, 300)
+    return reply
   })
 }
 
