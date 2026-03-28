@@ -1,5 +1,5 @@
 import type { Plugin, PluginContext } from '@phrasepress/core'
-import { createTables } from './db.js'
+import { createTables, resetStuckRunning, reconcileHistory } from './db.js'
 import { registerBackupRoutes } from './routes.js'
 import { BackupScheduler } from './scheduler.js'
 
@@ -16,6 +16,8 @@ const backupPlugin: Plugin = {
 
   async register(ctx: PluginContext) {
     createTables(ctx.db)
+    resetStuckRunning(ctx.db)
+    await reconcileHistory(ctx.db)
 
     await ctx.fastify.register(async (app) => {
       await registerBackupRoutes(app, ctx, scheduler)

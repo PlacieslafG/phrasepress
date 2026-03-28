@@ -244,10 +244,22 @@
     <div v-if="activeTab === 'history'" class="flex flex-col gap-4">
       <div class="flex justify-between items-center">
         <p class="text-sm text-surface-400">{{ history.total }} backup totali</p>
-        <Button icon="pi pi-refresh" severity="secondary" size="small" :loading="loadingHistory" @click="loadHistory" v-tooltip.bottom="'Aggiorna'" />
+        <div class="flex items-center gap-2">
+          <Button
+            v-if="selectedBackups.length > 0"
+            :label="`Elimina selezionati (${selectedBackups.length})`"
+            icon="pi pi-trash"
+            severity="danger"
+            size="small"
+            :loading="bulkDeleting"
+            @click="confirmBulkDelete"
+          />
+          <Button icon="pi pi-refresh" severity="secondary" size="small" :loading="loadingHistory" @click="loadHistory" v-tooltip.bottom="'Aggiorna'" />
+        </div>
       </div>
 
       <DataTable
+        v-model:selection="selectedBackups"
         :value="history.entries"
         :loading="loadingHistory"
         striped-rows
@@ -256,6 +268,24 @@
         <template #empty>
           <div class="text-center py-8 text-surface-400">Nessun backup nello storico.</div>
         </template>
+
+        <Column style="width: 48px" :exportable="false">
+          <template #body="{ data: e }: { data: BackupHistoryEntry }">
+            <Checkbox
+              v-model="selectedBackups"
+              :value="e"
+              :disabled="e.status === 'running'"
+            />
+          </template>
+          <template #header>
+            <Checkbox
+              :binary="true"
+              :model-value="allSelectable.length > 0 && allSelectable.length === selectedBackups.length"
+              :indeterminate="selectedBackups.length > 0 && selectedBackups.length < allSelectable.length"
+              @update:model-value="toggleSelectAll"
+            />
+          </template>
+        </Column>
 
         <Column header="Data" style="min-width: 150px">
           <template #body="{ data: e }: { data: BackupHistoryEntry }">
@@ -453,6 +483,7 @@ import {
   type BackupSchedule, type CreateScheduleBody,
 } from '@/api/backup.js'
 import { ApiError } from '@/api/client.js'
+import { useServerRestart } from '@/composables/useServerRestart.js'
 
 // ─── Tabs ─────────────────────────────────────────────────────────────────────
 
@@ -467,6 +498,7 @@ const activeTab = ref<string>('dashboard')
 
 const toast   = useToast()
 const confirm = useConfirm()
+const { captureBootId, showInitialPhase, pollUntilRestarted, cancel: cancelRestart } = useServerRestart()
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -558,18 +590,29 @@ const history = reactive<PaginatedHistory>({
   page:    1,
   limit:   20,
 })
-const loadingHistory = ref(false)
+const loadingHistory  = ref(false)
+const selectedBackups = ref<BackupHistoryEntry[]>([])
+const bulkDeleting    = ref(false)
 
 const lastBackup = computed<BackupHistoryEntry | null>(() =>
   history.entries.find(e => e.status === 'success') ?? null
 )
 
+const allSelectable = computed(() =>
+  history.entries.filter(e => e.status !== 'running')
+)
+
+function toggleSelectAll(val: boolean): void {
+  selectedBackups.value = val ? [...allSelectable.value] : []
+}
+
 // ─── State: restore dialog ────────────────────────────────────────────────────
 
-const restoreDialogVisible = ref(false)
-const restoreTarget        = ref<BackupHistoryEntry | null>(null)
-const restoreIncludes      = reactive<BackupIncludes>({ db: true, media: true, plugins: false, config: false })
-const restoring            = ref(false)
+const restoreDialogVisible  = ref(false)
+const restoreTarget         = ref<BackupHistoryEntry | null>(null)
+const restoreIncludes       = reactive<BackupIncludes>({ db: true, media: true, plugins: false, config: false })
+const restoring             = ref(false)
+
 
 // ─── Load ─────────────────────────────────────────────────────────────────────
 
@@ -589,6 +632,8 @@ async function loadHistory(): Promise<void> {
   try {
     const result = await getBackupHistory({ page: history.page, limit: history.limit })
     Object.assign(history, result)
+    // Clear selection when history reloads to avoid stale references
+    selectedBackups.value = []
   } catch (err) {
     showError(err)
   } finally {
@@ -612,8 +657,19 @@ async function refreshStatus(): Promise<void> {
     const status = await getBackupStatus()
     const wasRunning = backupStatus.isRunning
     Object.assign(backupStatus, status)
-    if (wasRunning && !status.isRunning) {
+
+    // Reload history either on isRunning transition OR if history has stale
+    // 'running' entries while the server reports nothing is running (race condition
+    // where the backup finished before we registered wasRunning=true).
+    const hasStaleRunning = !status.isRunning && history.entries.some(e => e.status === 'running')
+    if ((wasRunning && !status.isRunning) || hasStaleRunning) {
       await loadHistory()
+      const latest = history.entries[0]
+      if (latest?.status === 'success') {
+        toast.add({ severity: 'success', summary: 'Backup completato', detail: `${formatSize(latest.sizeBytes)} salvato correttamente.`, life: 5000 })
+      } else if (latest && latest.status !== 'running') {
+        toast.add({ severity: 'error', summary: 'Backup fallito', detail: latest.error ?? 'Errore sconosciuto', life: 8000 })
+      }
     }
   } catch { /* silenzioso */ }
 }
@@ -730,15 +786,30 @@ function confirmDeleteSchedule(schedule: BackupSchedule): void {
 
 // ─── Actions: trigger ─────────────────────────────────────────────────────────
 
-async function triggerManualBackup(): Promise<void> {
+function triggerManualBackup(): void {
   if (!triggerIncludes.db && !triggerIncludes.media && !triggerIncludes.plugins && !triggerIncludes.config) {
     toast.add({ severity: 'warn', summary: 'Seleziona almeno un elemento', life: 3000 })
     return
   }
+  const parts = includesLabel({ ...triggerIncludes })
+  confirm.require({
+    message:     `Verrà incluso: ${parts}. Avviare il backup adesso?`,
+    header:      'Conferma backup',
+    icon:        'pi pi-download',
+    rejectProps: { label: 'Annulla', severity: 'secondary', outlined: true },
+    acceptProps: { label: 'Esegui backup', icon: 'pi pi-download' },
+    accept:      runManualBackup,
+  })
+}
+
+async function runManualBackup(): Promise<void> {
   triggerRunning.value = true
   try {
     await triggerBackup({ includes: { ...triggerIncludes }, storageType: triggerStorageType.value })
     toast.add({ severity: 'info', summary: 'Backup avviato', detail: 'Il backup è in esecuzione in background.', life: 4000 })
+    // Imposta isRunning ottimisticamente: se il backup finisce prima del prossimo poll
+    // refreshStatus() vede wasRunning=true e mostra il toast di completamento.
+    backupStatus.isRunning = true
     await refreshStatus()
   } catch (err) {
     showError(err, 'Errore nel avviare il backup')
@@ -781,6 +852,38 @@ function confirmDeleteBackup(entry: BackupHistoryEntry): void {
   })
 }
 
+function confirmBulkDelete(): void {
+  const count = selectedBackups.value.length
+  confirm.require({
+    message:     `Eliminare ${count} backup selezionati? L'operazione non è reversibile.`,
+    header:      'Conferma eliminazione multipla',
+    icon:        'pi pi-trash',
+    rejectProps: { label: 'Annulla', severity: 'secondary', outlined: true },
+    acceptProps: { label: `Elimina ${count}`, severity: 'danger' },
+    accept:      executeBulkDelete,
+  })
+}
+
+async function executeBulkDelete(): Promise<void> {
+  bulkDeleting.value = true
+  const toDelete = [...selectedBackups.value]
+  const results = await Promise.allSettled(toDelete.map(e => deleteBackup(e.id)))
+  const failed  = results.filter(r => r.status === 'rejected').length
+  const deleted = results.length - failed
+
+  selectedBackups.value = []
+
+  if (deleted > 0) {
+    toast.add({ severity: 'success', summary: `${deleted} backup eliminati`, life: 3000 })
+  }
+  if (failed > 0) {
+    toast.add({ severity: 'error', summary: `${failed} eliminazioni fallite`, life: 5000 })
+  }
+
+  bulkDeleting.value = false
+  await loadHistory()
+}
+
 // ─── Actions: restore ────────────────────────────────────────────────────────
 
 function confirmRestore(entry: BackupHistoryEntry): void {
@@ -802,32 +905,32 @@ async function executeRestore(): Promise<void> {
 
   restoring.value = true
   try {
+    const bootIdBefore = await captureBootId()
+
+    showInitialPhase({
+      title: 'Ripristino backup',
+      steps: {
+        initial:   { label: 'Ripristino dati', description: 'Sostituzione database e file in corso…' },
+        reloading: { label: 'Ricarica pagina' },
+      },
+    })
+
     await restoreBackup(restoreTarget.value.id, { ...restoreIncludes })
     restoreDialogVisible.value = false
-    toast.add({
-      severity: 'info',
-      summary:  'Ripristino in corso…',
-      detail:   'Il server si sta riavviando. La pagina sarà disponibile tra pochi secondi.',
-      life:     8000,
+
+    pollUntilRestarted(bootIdBefore, {
+      dialog:      {},
+      onRestarted: () => { window.location.reload() },
+      onTimeout:   () => {
+        toast.add({ severity: 'warn', summary: 'Timeout', detail: 'Il server non risponde dopo 30s. Verifica i log.', life: 8000 })
+      },
     })
-    setTimeout(() => pollUntilRestart(), 2000)
   } catch (err) {
+    cancelRestart()
     showError(err, 'Errore nel ripristino')
   } finally {
     restoring.value = false
   }
-}
-
-async function pollUntilRestart(): Promise<void> {
-  let attempts = 0
-  const poll = async () => {
-    try {
-      const res = await fetch('/api/v1/health')
-      if (res.ok) { window.location.reload(); return }
-    } catch { /* server ancora offline */ }
-    if (++attempts < 30) setTimeout(poll, 1000)
-  }
-  await poll()
 }
 
 // ─── Formatters ───────────────────────────────────────────────────────────────
@@ -859,11 +962,11 @@ function intervalLabel(hours: number): string {
 }
 
 function statusLabel(status: string): string {
-  return ({ running: 'In corso', success: 'Completato', failed: 'Fallito' } as Record<string, string>)[status] ?? status
+  return ({ running: 'In corso', success: 'Completato', error: 'Errore', failed: 'Fallito' } as Record<string, string>)[status] ?? status
 }
 
 function statusSeverity(status: string): string {
-  return ({ running: 'info', success: 'success', failed: 'danger' } as Record<string, string>)[status] ?? 'secondary'
+  return ({ running: 'info', success: 'success', error: 'danger', failed: 'danger' } as Record<string, string>)[status] ?? 'secondary'
 }
 
 function showError(err: unknown, prefix = 'Errore'): void {

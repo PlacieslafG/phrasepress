@@ -1,6 +1,7 @@
-import { createReadStream, existsSync, statSync } from 'node:fs'
+import { createReadStream, existsSync, statSync, writeFileSync, readFileSync } from 'node:fs'
 import { unlink } from 'node:fs/promises'
-import { join } from 'node:path'
+import { join, resolve, dirname } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { tmpdir } from 'node:os'
 import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify'
 import type { PluginContext } from '@phrasepress/core'
@@ -14,6 +15,42 @@ import { startBackup } from './backup.js'
 import { restoreFromBackup } from './restore.js'
 import { downloadFromS3, deleteFile, deleteFromS3 } from './storage.js'
 import type { BackupScheduler } from './scheduler.js'
+
+const __dirname = dirname(fileURLToPath(import.meta.url))
+
+// Stessa tecnica usata dall'attivazione plugin: scrive lo stesso file watchato da nodemon.
+function triggerRestart(): void {
+  const triggerFile = resolve(__dirname, '../../../../packages/core/src/api/restart-trigger.ts')
+  writeFileSync(triggerFile, `// restart trigger — auto-generated\nexport const t = ${Date.now()}\n`)
+}
+
+// ─── Debug helpers ────────────────────────────────────────────────────────────
+
+function getTriggerFilePath(): string {
+  return resolve(__dirname, '../../../../packages/core/src/api/restart-trigger.ts')
+}
+
+function debugTriggerInfo(): Record<string, unknown> {
+  const triggerFile = getTriggerFilePath()
+  let currentContent: string | null = null
+  let fileExists = false
+  let fileStat: { mtime: string; size: number } | null = null
+
+  try {
+    currentContent = readFileSync(triggerFile, 'utf8')
+    const stat = statSync(triggerFile)
+    fileExists = true
+    fileStat = { mtime: stat.mtime.toISOString(), size: stat.size }
+  } catch { /* file may not exist */ }
+
+  return {
+    __dirname_at_runtime: __dirname,
+    trigger_file_path: triggerFile,
+    trigger_file_exists: fileExists,
+    trigger_file_stat: fileStat,
+    trigger_file_content: currentContent,
+  }
+}
 
 // ─── JSON Schemas ─────────────────────────────────────────────────────────────
 
@@ -116,6 +153,44 @@ export async function registerBackupRoutes(
 ): Promise<void> {
   const auth          = ctx.fastify.authenticate
   const requireManage = ctx.fastify.requireCapability('manage_options')
+
+  // ── GET /debug ─────────────────────────────────────────────────────────────
+  // DEBUG ONLY — da rimuovere in produzione
+  app.get('/debug', {
+    preHandler: [auth, requireManage],
+  }, async (_req: FastifyRequest, reply: FastifyReply) => {
+    const info = debugTriggerInfo()
+    console.log('[BACKUP DEBUG] /debug endpoint called:', JSON.stringify(info, null, 2))
+    return reply.send(info)
+  })
+
+  // ── POST /debug/trigger ───────────────────────────────────────────────────
+  // DEBUG ONLY — testa il trigger in isolamento, da rimuovere in produzione
+  app.post('/debug/trigger', {
+    preHandler: [auth, requireManage],
+  }, async (_req: FastifyRequest, reply: FastifyReply) => {
+    const before = debugTriggerInfo()
+    let writeError: string | null = null
+    let writeSuccess = false
+
+    try {
+      triggerRestart()
+      writeSuccess = true
+    } catch (err) {
+      writeError = err instanceof Error ? err.message : String(err)
+    }
+
+    const after = debugTriggerInfo()
+    const result = {
+      write_success: writeSuccess,
+      write_error: writeError,
+      before,
+      after,
+      trigger_content_changed: before.trigger_file_content !== after.trigger_file_content,
+    }
+    console.log('[BACKUP DEBUG] /debug/trigger result:', JSON.stringify(result, null, 2))
+    return reply.send(result)
+  })
 
   // ── GET /settings ─────────────────────────────────────────────────────────
   app.get('/settings', {
@@ -287,15 +362,45 @@ export async function registerBackupRoutes(
     const settings        = getSettings(ctx.db)
     const restoreIncludes = req.body.includes ?? entry.includes
 
+    console.log(`[BACKUP RESTORE] Avvio restore backup #${id} — includes:`, restoreIncludes)
+    console.log(`[BACKUP RESTORE] Trigger file path sarà: ${getTriggerFilePath()}`)
+
     try {
       await restoreFromBackup({ db: ctx.db, entry, settings, restoreIncludes })
+      console.log('[BACKUP RESTORE] restoreFromBackup() completato senza errori')
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err)
+      console.error('[BACKUP RESTORE] restoreFromBackup() ha lanciato un errore:', msg)
+      // If db was closed during restore the server is broken regardless — exit to let it restart cleanly.
+      // We detect this by checking if the error is NOT a validation error (those throw before touching live data).
+      const dbWasClosed = restoreIncludes.db === true
+        && !msg.includes('not found in backup archive')
+        && !msg.includes('not available')
+      if (dbWasClosed) {
+        console.log('[BACKUP RESTORE] DB era chiuso — invio risposta 500 e triggero restart')
+        await reply.status(500).send({ error: `Restore failed after DB was replaced: ${msg}. Il server si riavvierà.` })
+        setTimeout(() => {
+          console.log('[BACKUP RESTORE] triggerRestart() chiamato dopo errore con DB chiuso')
+          triggerRestart()
+          console.log('[BACKUP RESTORE] triggerRestart() completato')
+        }, 300)
+        return reply
+      }
       return reply.status(500).send({ error: `Restore failed: ${msg}` })
     }
 
+    console.log('[BACKUP RESTORE] Invio risposta success...')
     await reply.send({ success: true, restarting: true })
-    setTimeout(() => process.exit(0), 300)
+    console.log('[BACKUP RESTORE] Risposta inviata. Schedulo triggerRestart() tra 300ms...')
+    setTimeout(() => {
+      console.log('[BACKUP RESTORE] triggerRestart() chiamato — scrivo su:', getTriggerFilePath())
+      try {
+        triggerRestart()
+        console.log('[BACKUP RESTORE] triggerRestart() OK — file scritto, nodemon dovrebbe riavviarsi')
+      } catch (err) {
+        console.error('[BACKUP RESTORE] triggerRestart() FALLITO:', err)
+      }
+    }, 300)
   })
 
   // ── DELETE /history/:id ───────────────────────────────────────────────────

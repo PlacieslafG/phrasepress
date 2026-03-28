@@ -1,3 +1,5 @@
+import { existsSync, statSync, readdirSync } from 'node:fs'
+import { join, resolve } from 'node:path'
 import type { PluginContext } from '@phrasepress/core'
 import type {
   BackupSettings, BackupHistoryEntry, BackupSchedule, BackupIncludes,
@@ -277,6 +279,102 @@ export function insertHistory(db: Db, entry: Omit<BackupHistoryEntry, 'id'>): nu
     entry.createdAt,
   )
   return Number(result.lastInsertRowid)
+}
+
+/** At startup, reconcile entries stuck in 'running' after a crash or mid-restore restart.
+ *  If the zip file exists on disk the backup completed — mark it success.
+ *  Otherwise mark it error. */
+// ─── Reconcile history from disk ─────────────────────────────────────────────
+// After a DB restore the history table rolls back to the backup date, losing
+// records of newer backups. On startup we scan the backup folder and re-insert
+// any ZIP files that exist on disk but are missing from the table.
+export async function reconcileHistory(db: Db): Promise<void> {
+  const settings = getSettings(db)
+  const localDir = settings.localStoragePath.startsWith('/')
+    ? settings.localStoragePath
+    : resolve(process.cwd(), settings.localStoragePath)
+
+  if (!existsSync(localDir)) return
+
+  const files = readdirSync(localDir).filter(f => f.endsWith('.zip'))
+  if (files.length === 0) return
+
+  const known = new Set(
+    (client(db).prepare('SELECT filename FROM pp_backup_history').all() as { filename: string }[])
+      .map(r => r.filename),
+  )
+
+  for (const file of files) {
+    if (known.has(file)) continue
+
+    const filepath  = join(localDir, file)
+    const sizeBytes = statSync(filepath).size
+    const createdAt = parseTimestampFromFilename(file)
+    const includes  = await inspectZipIncludes(filepath)
+
+    client(db).prepare(`
+      INSERT INTO pp_backup_history
+        (filename, filepath, s3_key, size_bytes, includes, storage_type, status, error, created_at, schedule_id, schedule_name)
+      VALUES (?, ?, NULL, ?, ?, 'local', 'success', NULL, ?, NULL, NULL)
+    `).run(file, filepath, sizeBytes, JSON.stringify(includes), createdAt)
+  }
+}
+
+// Parses a Unix timestamp from filenames like 'backup-2026-03-28-09-15-15.zip'
+function parseTimestampFromFilename(filename: string): number {
+  const m = filename.match(/backup-(\d{4})-(\d{2})-(\d{2})-(\d{2})-(\d{2})-(\d{2})\.zip$/)
+  if (!m) return Math.floor(Date.now() / 1000)
+  const [, y, mo, d, h, mi, s] = m
+  return Math.floor(new Date(`${y}-${mo}-${d}T${h}:${mi}:${s}`).getTime() / 1000)
+}
+
+// Inspects a ZIP without extracting to detect which components it contains
+async function inspectZipIncludes(zipPath: string): Promise<BackupIncludes> {
+  const includes: BackupIncludes = { db: false, media: false, plugins: false, config: false }
+  try {
+    const unzipper = await import('unzipper')
+    const directory = await unzipper.Open.file(zipPath)
+    for (const entry of directory.files) {
+      const p = entry.path
+      if (p.startsWith('database/')) includes.db      = true
+      if (p.startsWith('media/'))    includes.media   = true
+      if (p.startsWith('plugins/'))  includes.plugins  = true
+      if (p.startsWith('config/'))   includes.config   = true
+    }
+  } catch { /* file unreadable — leave all false */ }
+  return includes
+}
+
+export function resetStuckRunning(db: Db): void {
+  const rows = client(db).prepare(
+    `SELECT id, filename, filepath FROM pp_backup_history WHERE status = 'running'`,
+  ).all() as { id: number; filename: string; filepath: string | null }[]
+
+  if (rows.length === 0) return
+
+  // Resolve the local storage dir to reconstruct paths when filepath is null
+  // (filepath is only saved to DB after the backup fully completes)
+  const settings = getSettings(db)
+  const localDir = settings.localStoragePath.startsWith('/')
+    ? settings.localStoragePath
+    : resolve(process.cwd(), settings.localStoragePath)
+
+  for (const row of rows) {
+    // Use explicit filepath if available, otherwise reconstruct from storage dir + filename
+    const candidate = row.filepath ?? join(localDir, row.filename)
+    if (existsSync(candidate)) {
+      const sizeBytes = statSync(candidate).size
+      client(db).prepare(`
+        UPDATE pp_backup_history SET status = 'success', size_bytes = ?, filepath = ? WHERE id = ?
+      `).run(sizeBytes, candidate, row.id)
+    } else {
+      client(db).prepare(`
+        UPDATE pp_backup_history
+        SET status = 'error', error = 'Server riavviato mentre il backup era in corso'
+        WHERE id = ?
+      `).run(row.id)
+    }
+  }
 }
 
 export function updateHistoryStatus(
