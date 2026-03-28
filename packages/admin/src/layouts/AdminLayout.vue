@@ -56,7 +56,7 @@
                 <span>{{ cx.label }}</span>
               </a>
             </RouterLink>
-            <RouterLink v-if="authStore.hasCapability('upload_files')" to="/media" v-slot="{ navigate, isActive }" custom>
+            <RouterLink v-if="appStore.isPluginActive('phrasepress-media') && authStore.hasCapability('upload_files')" to="/media" v-slot="{ navigate, isActive }" custom>
               <a @click="navigate" :class="navClass(isActive)">
                 <i class="pi pi-image text-sm shrink-0" />
                 <span>Media</span>

@@ -56,7 +56,7 @@ const router = createRouter({
           path: 'media',
           name: 'media',
           component: () => import('@/pages/MediaPage.vue'),
-          meta: { requireCapability: 'upload_files' },
+          meta: { requireCapability: 'upload_files', requirePlugin: 'phrasepress-media' },
         },
         {
           path: 'plugins',
@@ -78,49 +78,49 @@ const router = createRouter({
           path: 'field-groups',
           name: 'field-groups',
           component: () => import('@/pages/FieldGroupsPage.vue'),
-          meta: { requireCapability: 'manage_plugins' },
+          meta: { requireCapability: 'manage_plugins', requirePlugin: 'phrasepress-fields' },
         },
         {
           path: 'field-groups/new',
           name: 'field-group-new',
           component: () => import('@/pages/FieldGroupEditorPage.vue'),
-          meta: { requireCapability: 'manage_plugins' },
+          meta: { requireCapability: 'manage_plugins', requirePlugin: 'phrasepress-fields' },
         },
         {
           path: 'field-groups/:id',
           name: 'field-group-edit',
           component: () => import('@/pages/FieldGroupEditorPage.vue'),
-          meta: { requireCapability: 'manage_plugins' },
+          meta: { requireCapability: 'manage_plugins', requirePlugin: 'phrasepress-fields' },
         },
         {
           path: 'forms',
           name: 'forms',
           component: () => import('@/pages/FormsPage.vue'),
-          meta: { requireCapability: 'manage_plugins' },
+          meta: { requireCapability: 'manage_plugins', requirePlugin: 'phrasepress-forms' },
         },
         {
           path: 'forms/new',
           name: 'form-new',
           component: () => import('@/pages/FormEditorPage.vue'),
-          meta: { requireCapability: 'manage_plugins' },
+          meta: { requireCapability: 'manage_plugins', requirePlugin: 'phrasepress-forms' },
         },
         {
           path: 'forms/:id/edit',
           name: 'form-edit',
           component: () => import('@/pages/FormEditorPage.vue'),
-          meta: { requireCapability: 'manage_plugins' },
+          meta: { requireCapability: 'manage_plugins', requirePlugin: 'phrasepress-forms' },
         },
         {
           path: 'forms/:id/submissions',
           name: 'form-submissions',
           component: () => import('@/pages/FormSubmissionsPage.vue'),
-          meta: { requireCapability: 'manage_plugins' },
+          meta: { requireCapability: 'manage_plugins', requirePlugin: 'phrasepress-forms' },
         },
         {
           path: 'mailer-settings',
           name: 'mailer-settings',
           component: () => import('@/pages/MailerSettingsPage.vue'),
-          meta: { requireCapability: 'manage_options' },
+          meta: { requireCapability: 'manage_options', requirePlugin: 'phrasepress-mailer' },
         },
         {
           path: 'api-tester',
@@ -132,19 +132,19 @@ const router = createRouter({
           path: 'i18n',
           name: 'i18n-settings',
           component: () => import('@/pages/I18nSettingsPage.vue'),
-          meta: { requireCapability: 'manage_plugins' },
+          meta: { requireCapability: 'manage_plugins', requirePlugin: 'phrasepress-i18n' },
         },
         {
           path: 'db-monitor',
           name: 'db-monitor',
           component: () => import('@/pages/DbMonitorPage.vue'),
-          meta: { requireCapability: 'manage_options' },
+          meta: { requireCapability: 'manage_options', requirePlugin: 'phrasepress-db-monitor' },
         },
         {
           path: 'backup',
           name: 'backup',
           component: () => import('@/pages/BackupPage.vue'),
-          meta: { requireCapability: 'manage_options' },
+          meta: { requireCapability: 'manage_options', requirePlugin: 'phrasepress-backup' },
         },
       ],
     },
@@ -182,6 +182,13 @@ router.beforeEach(async (to) => {
   if (to.meta.requireCapability) {
     const cap = to.meta.requireCapability as string
     if (!auth.hasCapability(cap)) {
+      return { name: 'dashboard' }
+    }
+  }
+
+  if (to.meta.requirePlugin) {
+    const plugin = to.meta.requirePlugin as string
+    if (!useAppStore().isPluginActive(plugin)) {
       return { name: 'dashboard' }
     }
   }
