@@ -290,7 +290,7 @@
   async function init() {
     BASE = document.getElementById('base-url').value.replace(/\/$/, '')
     panel('loading')
-    const [ptRes, txRes] = await Promise.all([api('/post-types'), api('/taxonomies')])
+    const [ptRes, txRes] = await Promise.all([api('/codices'), api('/vocabularies')])
 
     if (!ptRes.ok) { panel('error', 'Impossibile connettersi all\'API. Controlla la URL e che il server sia avviato.'); return }
 
@@ -322,7 +322,7 @@
 
   function switchToPostType(name) {
     currentPostType = name
-    listState = { page: 1, limit: 20, status: 'any', search: '', taxFilters: {} }
+    listState = { page: 1, limit: 20, stage: 'any', search: '', taxFilters: {} }
     switchTab(`posts-${name}`)
     renderPostList()
   }
@@ -398,25 +398,25 @@
     const p = panel('loading')
 
     const qs = new URLSearchParams({
-      type:   currentPostType,
-      status: listState.status,
-      page:   listState.page,
-      limit:  listState.limit,
+      stage: listState.stage,
+      page:  listState.page,
+      limit: listState.limit,
     })
     if (listState.search) qs.set('search', listState.search)
     for (const [k, v] of Object.entries(listState.taxFilters)) {
       if (v) qs.set(k, v)
     }
 
-    const r = await api('/posts?' + qs)
+    const r = await api('/' + currentPostType + '?' + qs)
     if (!r.ok) { panel('error', r.data?.error ?? 'Errore API'); return }
 
-    const { data, total, page, pages } = r.data
+    const { data, total, page, limit: pageLimit } = r.data
+    const pages = Math.ceil(total / pageLimit)
 
     // Gather taxonomy options for this post type
-    const relTaxonomies = taxonomies.filter(tx => tx.postTypes.includes(currentPostType))
+    const relTaxonomies = taxonomies.filter(tx => tx.codices.includes(currentPostType))
     const taxOptions = await Promise.all(
-      relTaxonomies.map(tx => api(`/taxonomies/${tx.slug}/terms`).then(r => ({ tx, terms: r.ok ? (r.data.data ?? []) : [] })))
+      relTaxonomies.map(tx => api(`/vocabularies/${tx.slug}/terms`).then(r => ({ tx, terms: r.ok ? (r.data.data ?? []) : [] })))
     )
 
     // ── Filters bar ──
@@ -425,8 +425,8 @@
       <span style="font-size:.8rem;color:var(--muted)">${total} post totali</span>
     </div>
     <div class="filters">
-      <select onchange="listState.status=this.value;listState.page=1;renderPostList()">
-        ${['any','published','draft','trash'].map(s => `<option value="${s}" ${listState.status===s?'selected':''}>${s}</option>`).join('')}
+      <select onchange="listState.stage=this.value;listState.page=1;renderPostList()">
+        ${['any','published','draft','trash'].map(s => `<option value="${s}" ${listState.stage===s?'selected':''}>${s}</option>`).join('')}
       </select>
       <input type="text" placeholder="🔍 Cerca titolo…" value="${esc(listState.search)}"
         onkeyup="if(event.key==='Enter'){listState.search=this.value;listState.page=1;renderPostList()}"
@@ -438,7 +438,7 @@
           ${terms.map(t => `<option value="${esc(t.slug)}" ${(listState.taxFilters[tx.slug]||'')==t.slug?'selected':''}>${esc(t.name)}</option>`).join('')}
         </select>
       `).join('')}
-      <button class="btn btn-ghost btn-sm" onclick="listState={page:1,limit:20,status:'any',search:'',taxFilters:{}};renderPostList()">✕ Reset</button>
+      <button class="btn btn-ghost btn-sm" onclick="listState={page:1,limit:20,stage:'any',search:'',taxFilters:{}};renderPostList()">✕ Reset</button>
     </div>`
 
     if (data.length === 0) {
@@ -446,15 +446,15 @@
     } else {
       html += `<div class="post-list">`
       for (const post of data) {
-        const termChips = post.terms?.slice(0,4).map(t => `<span class="term-chip" onclick="event.stopPropagation();filterByTerm('${t.taxonomySlug}','${t.termSlug}')">${esc(t.termName)}</span>`).join('')
-        html += `<div class="post-item" onclick="openDetail(${post.id})">
+        const postTitle = post.fields?.title ?? '#' + post.id
+        const postSlug  = post.fields?.slug ?? ''
+        html += `<div class="post-item" onclick="openDetail(${post.id}, '${currentPostType}')">
           <div class="post-item-main">
-            <h3>${esc(post.title)}</h3>
-            <div class="slug"><code>/${post.postType}/${post.slug}</code></div>
-            ${termChips ? `<div class="terms-list" style="margin-top:.4rem">${termChips}</div>` : ''}
+            <h3>${esc(postTitle)}</h3>
+            <div class="slug"><code>/${post.codex}/${postSlug}</code></div>
           </div>
           <div class="post-item-meta">
-            <div><span class="badge badge-${post.status}">${post.status}</span></div>
+            <div><span class="badge badge-${post.stage}">${post.stage}</span></div>
             <div style="margin-top:.35rem">${fmt(post.createdAt)}</div>
             <div style="margin-top:.15rem;font-size:.72rem">#${post.id}</div>
           </div>
@@ -482,7 +482,8 @@
   }
 
   // ─── Post Detail Drawer ───────────────────────────────────────────────────
-  async function openDetail(id) {
+  async function openDetail(id, codex) {
+    const resolvedCodex = codex ?? currentPostType
     document.getElementById('overlay').classList.add('open')
     const drawer = document.getElementById('drawer')
     drawer.classList.add('open')
@@ -490,29 +491,32 @@
     document.getElementById('drawer-meta').textContent = ''
     document.getElementById('drawer-body').innerHTML = '<div class="loading">⏳</div>'
 
-    const r = await api(`/posts/${id}`)
+    const r = await api(`/${resolvedCodex}/${id}`)
     if (!r.ok) {
-      document.getElementById('drawer-body').innerHTML = `<div class="error-msg">Errore nel caricamento del post.</div>`
+      document.getElementById('drawer-body').innerHTML = `<div class="error-msg">Errore nel caricamento del folio.</div>`
       return
     }
     const post = r.data
-    document.getElementById('drawer-title').textContent = post.title
+    const postTitle = post.fields?.title ?? '#' + post.id
+    const postSlug  = post.fields?.slug ?? ''
+    document.getElementById('drawer-title').textContent = postTitle
 
-    const pt = postTypes.find(p => p.name === post.postType)
+    const pt = postTypes.find(p => p.name === post.codex)
     document.getElementById('drawer-meta').innerHTML =
-      `<span class="badge badge-${post.status}">${post.status}</span>` +
-      ` &nbsp;${post.postType} &nbsp;·&nbsp; <code>/${post.postType}/${post.slug}</code>` +
+      `<span class="badge badge-${post.stage}">${post.stage}</span>` +
+      ` &nbsp;${post.codex} &nbsp;·&nbsp; <code>/${post.codex}/${postSlug}</code>` +
       ` &nbsp;·&nbsp; ${fmt(post.createdAt)}`
 
     let body = ''
 
     // Content
-    if (post.content) {
-      body += `<div class="detail-section"><h4>Contenuto</h4><div class="content-html">${post.content}</div></div>`
+    const postContent = post.fields?.content
+    if (postContent) {
+      body += `<div class="detail-section"><h4>Contenuto</h4><div class="content-html">${postContent}</div></div>`
     }
 
     // Custom fields
-    const fieldDefs = pt?.fields ?? []
+    const fieldDefs = pt?.blueprint ?? []
     const fields = post.fields ?? {}
     const allKeys = [...new Set([...fieldDefs.map(f => f.name), ...Object.keys(fields)])]
     if (allKeys.length > 0 && Object.keys(fields).length > 0) {
@@ -547,8 +551,8 @@
     if (post.terms?.length) {
       const byTax = {}
       for (const t of post.terms) {
-        if (!byTax[t.taxonomyName]) byTax[t.taxonomyName] = []
-        byTax[t.taxonomyName].push(t)
+        if (!byTax[t.vocabularyName]) byTax[t.vocabularyName] = []
+        byTax[t.vocabularyName].push(t)
       }
       body += `<div class="detail-section"><h4>Tassonomie</h4>`
       for (const [taxName, terms] of Object.entries(byTax)) {
@@ -569,7 +573,7 @@
     </div>`
 
     // Revisions
-    const revR = await api(`/posts/${id}/revisions`)
+    const revR = await api(`/${resolvedCodex}/${id}/revisions`)
     if (revR.ok && revR.data.length) {
       body += `<div class="detail-section"><h4>Revisioni (${revR.data.length})</h4>
         <div style="display:flex;flex-direction:column;gap:.35rem">
@@ -599,7 +603,7 @@
 
     const termsBySlug = {}
     await Promise.all(taxonomies.map(async tx => {
-      const r = await api(`/taxonomies/${tx.slug}/terms?hierarchical=true`)
+      const r = await api(`/vocabularies/${tx.slug}/terms?hierarchical=true`)
       termsBySlug[tx.slug] = r.ok ? (r.data.data ?? []) : []
     }))
 
@@ -640,7 +644,7 @@
     if (count === 0) return
     const relPt = postTypes.find(pt => {
       const tx = taxonomies.find(t => t.slug === taxSlug)
-      return tx?.postTypes.includes(pt.name)
+      return tx?.codices.includes(pt.name)
     })
     if (!relPt) return
     currentPostType = relPt.name
@@ -656,7 +660,7 @@
     const p = document.getElementById('panel')
     let html = `<div class="panel-header"><span class="panel-title">Schema post types</span></div><div class="schema-grid">`
     for (const pt of postTypes) {
-      const fields = pt.fields ?? []
+      const fields = pt.blueprint ?? []
       html += `<div class="card">
         <div class="card-header">
           <h3>📄 ${esc(pt.label)}</h3>
@@ -676,7 +680,7 @@
         }
       }
       // Related taxonomies
-      const relTax = taxonomies.filter(tx => tx.postTypes.includes(pt.name))
+      const relTax = taxonomies.filter(tx => tx.codices.includes(pt.name))
       if (relTax.length) {
         html += `<hr class="sep" style="margin:.5rem 0">
           <div style="font-size:.72rem;color:var(--muted);font-weight:700;text-transform:uppercase;margin-bottom:.35rem">Tassonomie</div>
@@ -696,11 +700,10 @@
 
     const quickLinks = [
       ['GET', '/stats'],
-      ['GET', '/post-types'],
-      ['GET', '/taxonomies'],
-      ['GET', '/posts?type=post&status=any&limit=5'],
-      ['GET', '/posts?type=page&status=any&limit=5'],
-      ...taxonomies.map(tx => ['GET', `/taxonomies/${tx.slug}/terms`]),
+      ['GET', '/codices'],
+      ['GET', '/vocabularies'],
+      ...postTypes.map(pt => ['GET', `/${pt.name}?stage=any&limit=5`]),
+      ...taxonomies.map(tx => ['GET', `/vocabularies/${tx.slug}/terms`]),
     ]
 
     p.innerHTML = `
@@ -714,7 +717,7 @@
               <option>GET</option><option>POST</option><option>PUT</option><option>DELETE</option>
             </select>
             <span style="align-self:center;color:var(--muted);font-size:.82rem">${esc(BASE)}</span>
-            <input id="ex-path" type="text" placeholder="/posts?type=post" value="/stats" style="flex:1;min-width:200px;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:.35rem .65rem;font:inherit;font-size:.82rem;outline:none" />
+            <input id="ex-path" type="text" placeholder="/post?stage=any" value="/stats" style="flex:1;min-width:200px;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:.35rem .65rem;font:inherit;font-size:.82rem;outline:none" />
             <button class="btn btn-primary" onclick="runExplorer()">▶ Invia</button>
           </div>
           <div>
