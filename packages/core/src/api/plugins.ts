@@ -9,7 +9,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url))
 
 // Scrive un file in src/ per triggerare il restart di nodemon tramite file-watch
 function triggerRestart(): void {
-  const triggerFile = join(__dirname, '.restart-trigger.ts')
+  const triggerFile = join(__dirname, 'restart-trigger.ts')
   writeFileSync(triggerFile, `// restart trigger — auto-generated\nexport const t = ${Date.now()}\n`)
 }
 

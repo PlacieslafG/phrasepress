@@ -7,6 +7,7 @@
     "wizard": "node --import tsx/esm scripts/wizard.ts",
     "dev": "pnpm --filter @phrasepress/core dev",
     "dev:admin": "pnpm --filter @phrasepress/admin dev",
+    "dev:all": "pnpm --parallel --filter @phrasepress/core --filter @phrasepress/admin dev",
     "build": "pnpm --filter @phrasepress/core build && pnpm --filter @phrasepress/admin build",
     "db:generate": "pnpm --filter @phrasepress/core db:generate",
     "db:migrate": "pnpm --filter @phrasepress/core db:migrate",

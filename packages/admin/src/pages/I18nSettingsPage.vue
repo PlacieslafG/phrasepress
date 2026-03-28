@@ -179,6 +179,7 @@ import { ref, onMounted } from 'vue'
 import { useConfirm } from 'primevue/useconfirm'
 import { useToast } from 'primevue/usetoast'
 import { i18nApi } from '@/api/i18n.js'
+import { ApiError } from '@/api/client.js'
 import type { Locale, I18nConfig } from '@/api/i18n.js'
 
 const confirm = useConfirm()
@@ -192,8 +193,12 @@ async function loadLocales() {
   loadingLocales.value = true
   try {
     locales.value = await i18nApi.listLocales()
-  } catch {
-    toast.add({ severity: 'error', summary: 'Errore', detail: 'Impossibile caricare le lingue', life: 3000 })
+  } catch (err) {
+    if (err instanceof ApiError && err.status === 404) {
+      toast.add({ severity: 'warn', summary: 'Server in riavvio', detail: 'Il plugin è attivo ma il server non è ancora ripartito. Ricarica la pagina tra qualche secondo.', life: 6000 })
+    } else {
+      toast.add({ severity: 'error', summary: 'Errore', detail: 'Impossibile caricare le lingue', life: 3000 })
+    }
   } finally {
     loadingLocales.value = false
   }
@@ -288,8 +293,12 @@ async function loadSettings() {
       sourceLocale:   settings.value.sourceLocale,
       promptTemplate: settings.value.promptTemplate,
     }
-  } catch {
-    toast.add({ severity: 'error', summary: 'Errore caricamento impostazioni', life: 3000 })
+  } catch (err) {
+    if (err instanceof ApiError && err.status === 404) {
+      toast.add({ severity: 'warn', summary: 'Server in riavvio', detail: 'Il plugin è attivo ma il server non è ancora ripartito. Ricarica la pagina tra qualche secondo.', life: 6000 })
+    } else {
+      toast.add({ severity: 'error', summary: 'Errore caricamento impostazioni', life: 3000 })
+    }
   } finally {
     loadingSettings.value = false
   }

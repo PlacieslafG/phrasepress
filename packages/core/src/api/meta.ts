@@ -2,9 +2,13 @@ import type { FastifyPluginAsync } from 'fastify'
 import { db } from '../db/client.js'
 import { folios } from '../db/schema.js'
 import { sql } from 'drizzle-orm'
+import { randomUUID } from 'node:crypto'
 import type { CodexRegistry } from '../codices/registry.js'
 import type { IHookManager } from '../hooks/HookManager.js'
 import '../types.js'
+
+// Generated once per process — changes on every server restart.
+const SERVER_BOOT_ID = randomUUID()
 
 interface MetaPluginOptions {
   codexRegistry: CodexRegistry
@@ -17,7 +21,7 @@ const metaRoutes: FastifyPluginAsync<MetaPluginOptions> = async (fastify, opts) 
   // ── GET /health ──────────────────────────────────────────────────────────────
   // Unauthenticated — usato dall'admin UI per polling post-riavvio
   fastify.get('/health', async () => {
-    return { ok: true, timestamp: Date.now() }
+    return { ok: true, bootId: SERVER_BOOT_ID }
   })
 
   // ── GET /codices ─────────────────────────────────────────────────────────────
