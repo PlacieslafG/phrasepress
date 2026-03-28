@@ -355,7 +355,7 @@ const folioRoutes: FastifyPluginAsync<FoliosPluginOptions> = async (fastify, opt
       termIds?: number[]
     }
   }>('/:codex', {
-    preHandler: [fastify.authenticate, fastify.requireCapability('edit_posts')],
+    preHandler: [fastify.authenticate, fastify.requireCapability('edit_folios')],
     schema: {
       params: {
         type: 'object',
@@ -432,7 +432,7 @@ const folioRoutes: FastifyPluginAsync<FoliosPluginOptions> = async (fastify, opt
       termIds?: number[]
     }
   }>('/:codex/:id', {
-    preHandler: [fastify.authenticate, fastify.requireCapability('edit_posts')],
+    preHandler: [fastify.authenticate, fastify.requireCapability('edit_folios')],
     schema: {
       params: {
         type: 'object',
@@ -460,7 +460,7 @@ const folioRoutes: FastifyPluginAsync<FoliosPluginOptions> = async (fastify, opt
       .get()
     if (!existing) return reply.status(404).send({ error: 'Folio not found' })
 
-    if (existing.authorId !== request.userId && !request.userCapabilities.includes('edit_others_posts')) {
+    if (existing.authorId !== request.userId && !request.userCapabilities.includes('edit_others_folios')) {
       return reply.status(403).send({ error: 'Insufficient permissions to edit this folio' })
     }
 
@@ -504,7 +504,7 @@ const folioRoutes: FastifyPluginAsync<FoliosPluginOptions> = async (fastify, opt
     Params:      { codex: string; id: string }
     Querystring: { force?: string }
   }>('/:codex/:id', {
-    preHandler: [fastify.authenticate, fastify.requireCapability('delete_posts')],
+    preHandler: [fastify.authenticate, fastify.requireCapability('delete_folios')],
     schema: {
       params: {
         type: 'object',
@@ -529,12 +529,13 @@ const folioRoutes: FastifyPluginAsync<FoliosPluginOptions> = async (fastify, opt
       .get()
     if (!existing) return reply.status(404).send({ error: 'Folio not found' })
 
-    if (existing.authorId !== request.userId && !request.userCapabilities.includes('delete_others_posts')) {
+    if (existing.authorId !== request.userId && !request.userCapabilities.includes('delete_others_folios')) {
       return reply.status(403).send({ error: 'Insufficient permissions to delete this folio' })
     }
 
     if (force) {
       db.delete(folios).where(eq(folios.id, folioId)).run()
+      await hooksManager?.doAction('folio.deleted', folioId)
     } else {
       // Soft delete: sposta in stage 'trash'
       db.update(folios).set({
@@ -578,7 +579,7 @@ const folioRoutes: FastifyPluginAsync<FoliosPluginOptions> = async (fastify, opt
   fastify.post<{ Params: { codex: string; id: string; revId: string } }>(
     '/:codex/:id/revisions/:revId/restore',
     {
-      preHandler: [fastify.authenticate, fastify.requireCapability('edit_posts')],
+      preHandler: [fastify.authenticate, fastify.requireCapability('edit_folios')],
       schema: {
         params: {
           type: 'object',

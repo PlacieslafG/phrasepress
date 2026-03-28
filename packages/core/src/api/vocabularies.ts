@@ -394,7 +394,7 @@ export const folioTermsRoutes: FastifyPluginAsync<FolioTermsPluginOptions> = asy
     Params: { codex: string; id: string; vocabularySlug: string }
     Body:   { termIds: number[] }
   }>('/:codex/:id/terms/:vocabularySlug', {
-    preHandler: [fastify.authenticate, fastify.requireCapability('edit_posts')],
+    preHandler: [fastify.authenticate, fastify.requireCapability('edit_folios')],
     schema: {
       params: {
         type: 'object',

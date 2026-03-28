@@ -11,19 +11,19 @@ describe('isValidCapability', () => {
   it('ritorna false per stringhe sconosciute', () => {
     expect(isValidCapability('fly')).toBe(false)
     expect(isValidCapability('')).toBe(false)
-    expect(isValidCapability('EDIT_POSTS')).toBe(false) // case-sensitive
+    expect(isValidCapability('EDIT_POSTS')).toBe(false) // case-sensitive, also old WP name
   })
 })
 
 describe('hasCapability', () => {
   it('administrator ha sempre tutte le capability', () => {
     expect(hasCapability('administrator', [],               'manage_options')).toBe(true)
-    expect(hasCapability('administrator', [],               'edit_posts')).toBe(true)
+    expect(hasCapability('administrator', [],               'edit_folios')).toBe(true)
     expect(hasCapability('administrator', [],               'anything')).toBe(true)
   })
 
   it('ruolo non-admin con la capability richiesta → true', () => {
-    expect(hasCapability('editor', ['edit_posts', 'read'], 'edit_posts')).toBe(true)
+    expect(hasCapability('editor', ['edit_folios', 'read'], 'edit_folios')).toBe(true)
   })
 
   it('ruolo non-admin senza la capability richiesta → false', () => {
@@ -31,6 +31,6 @@ describe('hasCapability', () => {
   })
 
   it('lista capability vuota → false per qualsiasi ruolo non-admin', () => {
-    expect(hasCapability('author', [], 'edit_posts')).toBe(false)
+    expect(hasCapability('author', [], 'edit_folios')).toBe(false)
   })
 })

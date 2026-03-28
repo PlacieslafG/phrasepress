@@ -8,6 +8,13 @@
       "when": 1774515074694,
       "tag": "0000_initial_codex_schema",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1743120000000,
+      "tag": "0001_rename_capabilities",
+      "breakpoints": false
     }
   ]
 }

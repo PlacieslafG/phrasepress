@@ -5,11 +5,11 @@ import { roles, users } from './schema.js'
 
 const ALL_CAPABILITIES = [
   'read',
-  'edit_posts',
-  'edit_others_posts',
-  'publish_posts',
-  'delete_posts',
-  'delete_others_posts',
+  'edit_folios',
+  'edit_others_folios',
+  'publish_folios',
+  'delete_folios',
+  'delete_others_folios',
   'manage_terms',
   'manage_users',
   'manage_roles',
@@ -27,12 +27,12 @@ const DEFAULT_ROLES = [
   {
     name: 'Editor',
     slug: 'editor',
-    capabilities: ['read', 'edit_posts', 'edit_others_posts', 'publish_posts', 'delete_posts', 'manage_terms'],
+    capabilities: ['read', 'edit_folios', 'edit_others_folios', 'publish_folios', 'delete_folios', 'manage_terms'],
   },
   {
     name: 'Author',
     slug: 'author',
-    capabilities: ['read', 'edit_posts', 'publish_posts', 'delete_posts'],
+    capabilities: ['read', 'edit_folios', 'publish_folios', 'delete_folios'],
   },
 ]
 
