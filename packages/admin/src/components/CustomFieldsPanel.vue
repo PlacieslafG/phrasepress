@@ -68,7 +68,7 @@
         v-else-if="def.type === 'relationship'"
         :model-value="relVal(def.name)"
         @update:model-value="set(def.name, $event)"
-        :post-type="(def.fieldOptions?.postType as string) ?? 'post'"
+        :codex="(def.fieldOptions?.codex as string) ?? 'post'"
         :multiple="(def.fieldOptions?.multiple as boolean) ?? false"
       />
 

@@ -32,7 +32,7 @@ import { apiFetch } from '@/api/client.js'
 
 const props = defineProps<{
   modelValue: number | number[] | null
-  postType:   string   // codex name (backward-compat prop name)
+  codex:      string
   multiple?:  boolean
 }>()
 
@@ -51,7 +51,7 @@ onMounted(async () => {
   loading.value = true
   try {
     const res = await apiFetch<{ data: Array<{ id: number; fields: Record<string, unknown> }> }>(
-      `/api/v1/${encodeURIComponent(props.postType)}?stage=published&limit=100`
+      `/api/v1/${encodeURIComponent(props.codex)}?stage=published&limit=100`
     )
     options.value = res.data.map(f => ({ id: f.id, title: String(f.fields?.title ?? f.id) }))
   } catch {

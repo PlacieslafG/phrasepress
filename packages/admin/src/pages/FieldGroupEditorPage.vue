@@ -280,7 +280,7 @@ function openFieldDialog(item?: FieldItem) {
       translatable: item.translatable !== false,
     }
     selectOptionsText.value = item.options?.join('\n') ?? ''
-    relCodex.value         = (item.fieldOptions?.postType as string) ?? ''
+    relCodex.value         = (item.fieldOptions?.codex as string) ?? ''
     relMultiple.value       = (item.fieldOptions?.multiple as boolean) ?? false
     subFields.value         = (item.fieldOptions?.subFields as { name: string; label: string; type: string }[]) ?? []
   } else {
@@ -319,7 +319,7 @@ async function saveField() {
     payload.options = selectOptionsText.value.split('\n').map(s => s.trim()).filter(Boolean)
   }
   if (fieldForm.value.type === 'relationship') {
-    payload.fieldOptions = { postType: relCodex.value, multiple: relMultiple.value }
+    payload.fieldOptions = { codex: relCodex.value, multiple: relMultiple.value }
   }
   if (fieldForm.value.type === 'repeater') {
     payload.fieldOptions = { subFields: subFields.value }

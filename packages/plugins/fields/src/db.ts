@@ -11,7 +11,7 @@ export const ppFieldGroups = sqliteTable('pp_field_groups', {
   id:          text('id').primaryKey(),
   name:        text('name').notNull(),
   description: text('description').notNull().default(''),
-  postTypes:   text('post_types').notNull().default('[]'),   // JSON string[]
+  codices:     text('post_types').notNull().default('[]'),   // JSON string[]
   sortOrder:   integer('sort_order').notNull().default(0),
   createdAt:   integer('created_at').notNull(),
 })
@@ -80,20 +80,20 @@ export function dbGetGroup(db: Db, id: string) {
   return db.select().from(ppFieldGroups).where(eq(ppFieldGroups.id, id)).get() ?? null
 }
 
-export function dbCreateGroup(db: Db, data: { name: string; description: string; postTypes: string[] }) {
+export function dbCreateGroup(db: Db, data: { name: string; description: string; codices: string[] }) {
   const [row] = db.insert(ppFieldGroups).values({
     id:          randomUUID(),
     name:        data.name,
     description: data.description,
-    postTypes:   JSON.stringify(data.postTypes),
+    codices:   JSON.stringify(data.codices),
     createdAt:   Math.floor(Date.now() / 1000),
   }).returning().all()
   return row!
 }
 
-export function dbUpdateGroup(db: Db, id: string, data: { name: string; description: string; postTypes: string[] }) {
+export function dbUpdateGroup(db: Db, id: string, data: { name: string; description: string; codices: string[] }) {
   const [row] = db.update(ppFieldGroups)
-    .set({ name: data.name, description: data.description, postTypes: JSON.stringify(data.postTypes) })
+    .set({ name: data.name, description: data.description, codices: JSON.stringify(data.codices) })
     .where(eq(ppFieldGroups.id, id))
     .returning().all()
   return row ?? null

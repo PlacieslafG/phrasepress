@@ -7,7 +7,7 @@ import { registerFieldRoutes } from './routes.js'
 export interface FieldGroupDef {
   name:         string
   description?: string
-  /** Codex names this group applies to (ex "postTypes") */
+  /** Codex names this group applies to */
   codices:      string[]
   fields:       FieldDefinition[]
 }
@@ -40,7 +40,7 @@ const fieldsPlugin: Plugin = {
       let dbGroups: Array<{ codices: string[]; fields: FieldDefinition[] }> = []
       try {
         dbGroups = dbListGroups(ctx.db).map(row => ({
-          codices: JSON.parse(row.postTypes) as string[],
+          codices: JSON.parse(row.codices) as string[],
           fields:  dbListItems(ctx.db, row.id).map(item => ({
             name:         item.name,
             label:        item.label || item.name,
