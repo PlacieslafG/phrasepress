@@ -374,6 +374,7 @@ ${pluginImports}
 })
 `
 
+  await backupConfigIfExists()
   await fs.writeFile(CONFIG_FILE, configContent, 'utf8')
   print(green(`  ✓  phrasepress.config.ts aggiornato`))
 }
@@ -561,12 +562,83 @@ async function launchProduction() {
 }
 
 // ---------------------------------------------------------------------------
+// Config backup helper
+// ---------------------------------------------------------------------------
+
+async function backupConfigIfExists(): Promise<void> {
+  if (!fsSync.existsSync(CONFIG_FILE)) return
+  const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)
+  const backupPath = path.join(ROOT, 'config', `phrasepress.config.backup-${timestamp}.ts`)
+  await fs.copyFile(CONFIG_FILE, backupPath)
+  print(yellow('  ⚠  phrasepress.config.ts esiste già — backup creato:'))
+  print(dim(`     ${backupPath}`))
+}
+
+// ---------------------------------------------------------------------------
+// Template selection
+// ---------------------------------------------------------------------------
+
+const CONFIG_TEMPLATES = [
+  { label: 'Blog',                description: 'Blog classico con post, pagine, categorie e tag',                   file: 'blog.ts' },
+  { label: 'Knowledge Base',      description: 'Articoli KB, guide e release notes con workflow di review',         file: 'knowledge-base.ts' },
+  { label: 'Portfolio / Agenzia', description: 'Progetti, servizi e testimonial per studi creativi',                file: 'portfolio.ts' },
+  { label: 'E-commerce / Catalogo', description: 'Catalogo prodotti con SKU, prezzi, disponibilità e recensioni', file: 'ecommerce.ts' },
+  { label: 'Testata Editoriale',  description: 'Articoli news, editoriali e workflow di pubblicazione',             file: 'news.ts' },
+  { label: 'Sito Aziendale',      description: 'Pagine, team, case study e servizi per siti corporate',             file: 'corporate.ts' },
+] as const
+
+async function selectTemplate(): Promise<void> {
+  printSection('Template di partenza')
+
+  print('  Scegli una configurazione preimpostata per phrasepress.config.ts:')
+  print('')
+  CONFIG_TEMPLATES.forEach((t, i) => {
+    print(`    ${cyan(String(i + 1))}. ${bold(t.label)}`)
+    print(`       ${dim(t.description)}`)
+  })
+  const fromScratch = CONFIG_TEMPLATES.length + 1
+  print(`    ${cyan(String(fromScratch))}. ${bold('Configura da zero')}  ${dim('(nessun template applicato)')}`)
+  print('')
+
+  const answer = await ask('Scelta', String(fromScratch))
+  const choice = parseInt(answer, 10)
+
+  if (isNaN(choice) || choice < 1 || choice > fromScratch) {
+    print(yellow('  Scelta non valida — nessun template applicato.'))
+    return
+  }
+
+  if (choice === fromScratch) {
+    print(dim('  Configurazione da zero — nessun template applicato.'))
+    return
+  }
+
+  const selected = CONFIG_TEMPLATES[choice - 1]
+  const templatePath = path.join(ROOT, 'config', 'templates', selected.file)
+  const templateContent = await fs.readFile(templatePath, 'utf8')
+
+  // Adjust the import path: templates use '../../packages/', config/ uses '../packages/'
+  const configContent = templateContent.replace(
+    /from '\.\.\/\.\.\//g,
+    "from '../"
+  )
+
+  await backupConfigIfExists()
+  await fs.writeFile(CONFIG_FILE, configContent, 'utf8')
+  print(green(`  ✓  Template "${selected.label}" applicato a phrasepress.config.ts`))
+  print(dim('     Puoi personalizzarlo ulteriormente durante il prossimo step.'))
+}
+
+// ---------------------------------------------------------------------------
 // Main
 // ---------------------------------------------------------------------------
 
 async function main() {
   printBanner()
   checkPrerequisites()
+
+  // ── Template selection ────────────────────────────────────────────────────
+  await selectTemplate()
 
   // ── Existing .env check ──────────────────────────────────────────────────
   let envExists = fsSync.existsSync(ENV_FILE)
