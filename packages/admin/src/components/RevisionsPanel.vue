@@ -42,7 +42,7 @@ import { foliosApi } from '@/api/folios.js'
 import type { FolioRevision } from '@/api/folios.js'
 import { useToast } from 'primevue/usetoast'
 
-const props = defineProps<{ codex: string; postId: number }>()
+const props = defineProps<{ codex: string; folioId: number }>()
 const emit  = defineEmits<{ restored: [] }>()
 
 const toast    = useToast()
@@ -62,7 +62,7 @@ function formatDate(ts: number) {
 async function load() {
   loading.value = true
   try {
-    revisions.value = await foliosApi.getRevisions(props.codex, props.postId)
+    revisions.value = await foliosApi.getRevisions(props.codex, props.folioId)
   } catch {
     /* silenzioso */
   } finally {
@@ -79,7 +79,7 @@ async function doRestore() {
   if (!pendingRev.value) return
   showConfirm.value = false
   try {
-    await foliosApi.restoreRevision(props.codex, props.postId, pendingRev.value.id)
+    await foliosApi.restoreRevision(props.codex, props.folioId, pendingRev.value.id)
     emit('restored')
     toast.add({ severity: 'success', summary: 'Revisione ripristinata', life: 2000 })
     await load()

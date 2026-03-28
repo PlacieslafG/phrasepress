@@ -12,17 +12,17 @@ const i18nPlugin: Plugin = {
   },
 
   async register(ctx: PluginContext) {
-    // Segna le traduzioni come dirty quando il post sorgente viene aggiornato
-    ctx.hooks.addAction('post.updated', async (postId: unknown) => {
-      if (typeof postId === 'number') {
-        dbMarkTranslationsDirty(ctx.db, postId)
+    // Segna le traduzioni come dirty quando il folio sorgente viene aggiornato
+    ctx.hooks.addAction('folio.updated', async (folioId: unknown) => {
+      if (typeof folioId === 'number') {
+        dbMarkTranslationsDirty(ctx.db, folioId)
       }
     })
 
-    // Elimina tutte le traduzioni quando il post viene eliminato definitivamente
-    ctx.hooks.addAction('post.deleted', async (postId: unknown) => {
-      if (typeof postId === 'number') {
-        dbDeleteAllTranslations(ctx.db, postId)
+    // Elimina tutte le traduzioni quando il folio viene eliminato definitivamente
+    ctx.hooks.addAction('folio.deleted', async (folioId: unknown) => {
+      if (typeof folioId === 'number') {
+        dbDeleteAllTranslations(ctx.db, folioId)
       }
     })
 

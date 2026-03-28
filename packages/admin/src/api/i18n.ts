@@ -13,7 +13,7 @@ export interface Locale {
 
 export interface Translation {
   id:        number
-  postId:    number
+  folioId:   number
   locale:    string
   title:     string
   slug:      string
@@ -72,36 +72,36 @@ export const i18nApi = {
   },
 
   // Translations
-  listTranslations(postId: number): Promise<Translation[]> {
-    return apiFetch<Translation[]>(`${BASE}/posts/${postId}/translations`)
+  listTranslations(folioId: number): Promise<Translation[]> {
+    return apiFetch<Translation[]>(`${BASE}/folios/${folioId}/translations`)
   },
 
-  getTranslation(postId: number, locale: string): Promise<Translation> {
-    return apiFetch<Translation>(`${BASE}/posts/${postId}/translations/${encodeURIComponent(locale)}`)
+  getTranslation(folioId: number, locale: string): Promise<Translation> {
+    return apiFetch<Translation>(`${BASE}/folios/${folioId}/translations/${encodeURIComponent(locale)}`)
   },
 
-  upsertTranslation(postId: number, locale: string, data: TranslationInput): Promise<Translation> {
-    return apiFetch<Translation>(`${BASE}/posts/${postId}/translations/${encodeURIComponent(locale)}`, {
+  upsertTranslation(folioId: number, locale: string, data: TranslationInput): Promise<Translation> {
+    return apiFetch<Translation>(`${BASE}/folios/${folioId}/translations/${encodeURIComponent(locale)}`, {
       method: 'PUT',
       body:   JSON.stringify(data),
     })
   },
 
-  deleteTranslation(postId: number, locale: string): Promise<void> {
-    return apiFetch<void>(`${BASE}/posts/${postId}/translations/${encodeURIComponent(locale)}`, {
+  deleteTranslation(folioId: number, locale: string): Promise<void> {
+    return apiFetch<void>(`${BASE}/folios/${folioId}/translations/${encodeURIComponent(locale)}`, {
       method: 'DELETE',
     })
   },
 
   // Auto-translation
-  autoTranslate(postId: number, locale: string): Promise<Translation> {
-    return apiFetch<Translation>(`${BASE}/posts/${postId}/translate/${encodeURIComponent(locale)}`, {
+  autoTranslate(folioId: number, locale: string): Promise<Translation> {
+    return apiFetch<Translation>(`${BASE}/folios/${folioId}/translate/${encodeURIComponent(locale)}`, {
       method: 'POST',
     })
   },
 
-  startTranslateAll(postId: number): Promise<{ jobId: string; total: number }> {
-    return apiFetch<{ jobId: string; total: number }>(`${BASE}/posts/${postId}/translate-all`, {
+  startTranslateAll(folioId: number): Promise<{ jobId: string; total: number }> {
+    return apiFetch<{ jobId: string; total: number }>(`${BASE}/folios/${folioId}/translate-all`, {
       method: 'POST',
     })
   },

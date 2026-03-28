@@ -3,7 +3,7 @@ import { ref, computed } from 'vue'
 
 export interface ActiveTranslationJob {
   jobId:   string
-  postId:  number
+  folioId: number
   total:   number
   completed: number
   failed:  number
@@ -25,8 +25,8 @@ export const useI18nJobsStore = defineStore('i18nJobs', () => {
 
   const isRunning = computed(() => activeJob.value !== null)
 
-  function startJob(jobId: string, postId: number, total: number) {
-    activeJob.value = { jobId, postId, total, completed: 0, failed: 0 }
+  function startJob(jobId: string, folioId: number, total: number) {
+    activeJob.value = { jobId, folioId, total, completed: 0, failed: 0 }
     localStorage.setItem(STORAGE_KEY, JSON.stringify(activeJob.value))
   }
 

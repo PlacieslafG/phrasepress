@@ -15,7 +15,7 @@ export const ppI18nLocales = sqliteTable('pp_i18n_locales', {
 
 export const ppI18nTranslations = sqliteTable('pp_i18n_translations', {
   id:        integer('id').primaryKey({ autoIncrement: true }),
-  postId:    integer('post_id').notNull(),
+  folioId:   integer('post_id').notNull(),
   locale:    text('locale').notNull(),
   title:     text('title').notNull().default(''),
   slug:      text('slug').notNull().default(''),
@@ -25,7 +25,7 @@ export const ppI18nTranslations = sqliteTable('pp_i18n_translations', {
   isDirty:   integer('is_dirty').notNull().default(0), // 1 = source post updated after this translation
   updatedAt: integer('updated_at').notNull(),
 }, (t) => [
-  uniqueIndex('pp_i18n_trans_post_locale_idx').on(t.postId, t.locale),
+  uniqueIndex('pp_i18n_trans_post_locale_idx').on(t.folioId, t.locale),
   uniqueIndex('pp_i18n_trans_slug_locale_idx').on(t.locale, t.slug),
 ])
 
@@ -99,7 +99,7 @@ export function serializeLocale(row: LocaleRow) {
 export function serializeTranslation(row: TranslationRow) {
   return {
     id:        row.id,
-    postId:    row.postId,
+    folioId:   row.folioId,
     locale:    row.locale,
     title:     row.title,
     slug:      row.slug,
@@ -167,20 +167,20 @@ export function dbDeleteLocale(db: Db, code: string): void {
 
 // ─── Translation queries ──────────────────────────────────────────────────────
 
-export function dbListTranslations(db: Db, postId: number): TranslationRow[] {
+export function dbListTranslations(db: Db, folioId: number): TranslationRow[] {
   return db.select().from(ppI18nTranslations)
-    .where(eq(ppI18nTranslations.postId, postId))
+    .where(eq(ppI18nTranslations.folioId, folioId))
     .all()
 }
 
-export function dbGetTranslation(db: Db, postId: number, locale: string): TranslationRow | undefined {
+export function dbGetTranslation(db: Db, folioId: number, locale: string): TranslationRow | undefined {
   return db.select().from(ppI18nTranslations)
-    .where(and(eq(ppI18nTranslations.postId, postId), eq(ppI18nTranslations.locale, locale)))
+    .where(and(eq(ppI18nTranslations.folioId, folioId), eq(ppI18nTranslations.locale, locale)))
     .get()
 }
 
 export function dbUpsertTranslation(db: Db, data: {
-  postId:   number
+  folioId:  number
   locale:   string
   title:    string
   slug:     string
@@ -190,10 +190,10 @@ export function dbUpsertTranslation(db: Db, data: {
   isDirty?: boolean
 }): TranslationRow {
   const now = Math.floor(Date.now() / 1000)
-  const existing = dbGetTranslation(db, data.postId, data.locale)
+  const existing = dbGetTranslation(db, data.folioId, data.locale)
 
   const values = {
-    postId:    data.postId,
+    folioId:   data.folioId,
     locale:    data.locale,
     title:     data.title,
     slug:      data.slug,
@@ -207,32 +207,32 @@ export function dbUpsertTranslation(db: Db, data: {
   if (existing) {
     db.update(ppI18nTranslations)
       .set(values)
-      .where(and(eq(ppI18nTranslations.postId, data.postId), eq(ppI18nTranslations.locale, data.locale)))
+      .where(and(eq(ppI18nTranslations.folioId, data.folioId), eq(ppI18nTranslations.locale, data.locale)))
       .run()
   } else {
     db.insert(ppI18nTranslations).values(values).run()
   }
 
   return db.select().from(ppI18nTranslations)
-    .where(and(eq(ppI18nTranslations.postId, data.postId), eq(ppI18nTranslations.locale, data.locale)))
+    .where(and(eq(ppI18nTranslations.folioId, data.folioId), eq(ppI18nTranslations.locale, data.locale)))
     .get()!
 }
 
-export function dbDeleteTranslation(db: Db, postId: number, locale: string): void {
+export function dbDeleteTranslation(db: Db, folioId: number, locale: string): void {
   db.delete(ppI18nTranslations)
-    .where(and(eq(ppI18nTranslations.postId, postId), eq(ppI18nTranslations.locale, locale)))
+    .where(and(eq(ppI18nTranslations.folioId, folioId), eq(ppI18nTranslations.locale, locale)))
     .run()
 }
 
-export function dbDeleteAllTranslations(db: Db, postId: number): void {
-  db.delete(ppI18nTranslations).where(eq(ppI18nTranslations.postId, postId)).run()
+export function dbDeleteAllTranslations(db: Db, folioId: number): void {
+  db.delete(ppI18nTranslations).where(eq(ppI18nTranslations.folioId, folioId)).run()
 }
 
 // Marca tutte le traduzioni di un post come "dirty" (sorgente cambiata)
-export function dbMarkTranslationsDirty(db: Db, postId: number): void {
+export function dbMarkTranslationsDirty(db: Db, folioId: number): void {
   db.update(ppI18nTranslations)
     .set({ isDirty: 1 })
-    .where(eq(ppI18nTranslations.postId, postId))
+    .where(eq(ppI18nTranslations.folioId, folioId))
     .run()
 }
 

@@ -109,8 +109,8 @@ interface FieldDef {
 }
 
 const props = defineProps<{
-  postId:    number
-  postType:  string
+  folioId:   number
+  codex:     string
   fieldDefs: FieldDef[]
 }>()
 
@@ -156,7 +156,7 @@ async function saveDrawerTranslation() {
   if (!selectedLocale.value) return
   drawerSaving.value = true
   try {
-    const t = await i18nApi.upsertTranslation(props.postId, selectedLocale.value.code, drawerForm.value)
+    const t = await i18nApi.upsertTranslation(props.folioId, selectedLocale.value.code, drawerForm.value)
     onTranslationSaved(t)
     toast.add({ severity: 'success', summary: 'Traduzione salvata', life: 2000 })
   } catch (err: unknown) {
@@ -170,7 +170,7 @@ async function deleteDrawerTranslation() {
   if (!selectedLocale.value) return
   drawerDeleting.value = true
   try {
-    await i18nApi.deleteTranslation(props.postId, selectedLocale.value.code)
+    await i18nApi.deleteTranslation(props.folioId, selectedLocale.value.code)
     onTranslationDeleted(selectedLocale.value.code)
     toast.add({ severity: 'success', summary: 'Traduzione eliminata', life: 2000 })
   } catch (err: unknown) {
@@ -185,7 +185,7 @@ async function load() {
   try {
     const [locs, trans] = await Promise.all([
       i18nApi.listLocales(),
-      i18nApi.listTranslations(props.postId),
+      i18nApi.listTranslations(props.folioId),
     ])
     locales.value      = locs
     translations.value = trans
@@ -210,7 +210,7 @@ function onTranslationDeleted(locale: string) {
 async function autoTranslateSingle(locale: Locale) {
   translatingLocale.value = locale.code
   try {
-    const t = await i18nApi.autoTranslate(props.postId, locale.code)
+    const t = await i18nApi.autoTranslate(props.folioId, locale.code)
     onTranslationSaved(t)
     toast.add({ severity: 'success', summary: `${locale.label} tradotta`, life: 2500 })
   } catch (err: unknown) {
@@ -230,7 +230,7 @@ async function translateAll() {
     for (const locale of targets) {
       translatingLocale.value = locale.code
       try {
-        const t = await i18nApi.autoTranslate(props.postId, locale.code)
+        const t = await i18nApi.autoTranslate(props.folioId, locale.code)
         onTranslationSaved(t)
         successes++
       } catch {

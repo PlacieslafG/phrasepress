@@ -88,8 +88,8 @@ function pruneJobs(): void {
 async function runTranslateAll(
   ctx:     PluginContext,
   jobId:   string,
-  postId:  number,
-  post:    { id: number; postType: string; title: string; content: string; fields: Record<string, unknown>; status: string },
+  folioId: number,
+  post:    { id: number; codex: string; title: string; content: string; fields: Record<string, unknown>; stage: string },
   config:  TranslatorConfig,
   locales: LocaleRow[],
 ): Promise<void> {
@@ -102,11 +102,11 @@ async function runTranslateAll(
       ])
       const fieldDefs = await getFieldDefs(ctx, post.codex)
       const translatedFields = await translateFields(config, post.fields, fieldDefs, localeRow.code)
-      const existing  = dbGetTranslation(ctx.db, postId, localeRow.code)
+      const existing  = dbGetTranslation(ctx.db, folioId, localeRow.code)
       const baseSlug  = generateSlug(translatedTitle)
       const finalSlug = ensureUniqueTranslationSlug(ctx.db, localeRow.code, baseSlug, existing?.id)
       dbUpsertTranslation(ctx.db, {
-        postId, locale: localeRow.code, title: translatedTitle, slug: finalSlug,
+        folioId, locale: localeRow.code, title: translatedTitle, slug: finalSlug,
         content: translatedContent, fields: translatedFields, status: post.stage, isDirty: false,
       })
       job.completed++
@@ -187,29 +187,29 @@ export async function registerI18nRoutes(app: FastifyInstance, ctx: PluginContex
     return reply.status(204).send()
   })
 
-  // ── GET /posts/:postId/translations ──────────────────────────────────────
-  app.get<{ Params: { postId: string } }>('/posts/:postId/translations', {
+  // ── GET /folios/:folioId/translations ──────────────────────────────────────
+  app.get<{ Params: { folioId: string } }>('/folios/:folioId/translations', {
     preHandler: auth,
-  }, async (req: FastifyRequest<{ Params: { postId: string } }>, reply: FastifyReply) => {
-    const postId = parseInt(req.params.postId, 10)
-    if (isNaN(postId)) return reply.status(400).send({ error: 'Invalid postId' })
-    return dbListTranslations(ctx.db, postId).map(serializeTranslation)
+  }, async (req: FastifyRequest<{ Params: { folioId: string } }>, reply: FastifyReply) => {
+    const folioId = parseInt(req.params.folioId, 10)
+    if (isNaN(folioId)) return reply.status(400).send({ error: 'Invalid folioId' })
+    return dbListTranslations(ctx.db, folioId).map(serializeTranslation)
   })
 
-  // ── GET /posts/:postId/translations/:locale ───────────────────────────────
-  app.get<{ Params: { postId: string; locale: string } }>('/posts/:postId/translations/:locale', {
+  // ── GET /folios/:folioId/translations/:locale ───────────────────────────────
+  app.get<{ Params: { folioId: string; locale: string } }>('/folios/:folioId/translations/:locale', {
     preHandler: auth,
-  }, async (req: FastifyRequest<{ Params: { postId: string; locale: string } }>, reply: FastifyReply) => {
-    const postId = parseInt(req.params.postId, 10)
-    if (isNaN(postId)) return reply.status(400).send({ error: 'Invalid postId' })
-    const translation = dbGetTranslation(ctx.db, postId, req.params.locale)
+  }, async (req: FastifyRequest<{ Params: { folioId: string; locale: string } }>, reply: FastifyReply) => {
+    const folioId = parseInt(req.params.folioId, 10)
+    if (isNaN(folioId)) return reply.status(400).send({ error: 'Invalid folioId' })
+    const translation = dbGetTranslation(ctx.db, folioId, req.params.locale)
     if (!translation) return reply.status(404).send({ error: 'Translation not found' })
     return serializeTranslation(translation)
   })
 
-  // ── PUT /posts/:postId/translations/:locale — crea o aggiorna ────────────
+  // ── PUT /folios/:folioId/translations/:locale — crea o aggiorna ────────────
   app.put<{
-    Params: { postId: string; locale: string }
+    Params: { folioId: string; locale: string }
     Body: {
       title:   string
       slug?:   string
@@ -217,7 +217,7 @@ export async function registerI18nRoutes(app: FastifyInstance, ctx: PluginContex
       fields?:  Record<string, unknown>
       status?:  string
     }
-  }>('/posts/:postId/translations/:locale', {
+  }>('/folios/:folioId/translations/:locale', {
     preHandler: auth,
     schema: {
       body: {
@@ -233,11 +233,11 @@ export async function registerI18nRoutes(app: FastifyInstance, ctx: PluginContex
       },
     },
   }, async (req: FastifyRequest<{
-    Params: { postId: string; locale: string }
+    Params: { folioId: string; locale: string }
     Body: { title: string; slug?: string; content?: string; fields?: Record<string, unknown>; status?: string }
   }>, reply: FastifyReply) => {
-    const postId = parseInt(req.params.postId, 10)
-    if (isNaN(postId)) return reply.status(400).send({ error: 'Invalid postId' })
+    const folioId = parseInt(req.params.folioId, 10)
+    if (isNaN(folioId)) return reply.status(400).send({ error: 'Invalid folioId' })
 
     const locale = req.params.locale
     if (!dbGetLocale(ctx.db, locale)) {
@@ -245,7 +245,7 @@ export async function registerI18nRoutes(app: FastifyInstance, ctx: PluginContex
     }
 
     // Calcola slug unico per questo locale
-    const existingTranslation = dbGetTranslation(ctx.db, postId, locale)
+    const existingTranslation = dbGetTranslation(ctx.db, folioId, locale)
     const baseSlug = req.body.slug
       ? generateSlug(req.body.slug)
       : generateSlug(req.body.title)
@@ -257,7 +257,7 @@ export async function registerI18nRoutes(app: FastifyInstance, ctx: PluginContex
     )
 
     const row = dbUpsertTranslation(ctx.db, {
-      postId,
+      folioId,
       locale,
       title:   req.body.title,
       slug:    finalSlug,
@@ -269,30 +269,30 @@ export async function registerI18nRoutes(app: FastifyInstance, ctx: PluginContex
     return serializeTranslation(row)
   })
 
-  // ── DELETE /posts/:postId/translations/:locale ────────────────────────────
-  app.delete<{ Params: { postId: string; locale: string } }>('/posts/:postId/translations/:locale', {
+  // ── DELETE /folios/:folioId/translations/:locale ────────────────────────────
+  app.delete<{ Params: { folioId: string; locale: string } }>('/folios/:folioId/translations/:locale', {
     preHandler: auth,
-  }, async (req: FastifyRequest<{ Params: { postId: string; locale: string } }>, reply: FastifyReply) => {
-    const postId = parseInt(req.params.postId, 10)
-    if (isNaN(postId)) return reply.status(400).send({ error: 'Invalid postId' })
-    dbDeleteTranslation(ctx.db, postId, req.params.locale)
+  }, async (req: FastifyRequest<{ Params: { folioId: string; locale: string } }>, reply: FastifyReply) => {
+    const folioId = parseInt(req.params.folioId, 10)
+    if (isNaN(folioId)) return reply.status(400).send({ error: 'Invalid folioId' })
+    dbDeleteTranslation(ctx.db, folioId, req.params.locale)
     return reply.status(204).send()
   })
 
-  // ── POST /posts/:postId/translate/:locale — auto-traduzione LLM ──────────
-  app.post<{ Params: { postId: string; locale: string } }>('/posts/:postId/translate/:locale', {
+  // ── POST /folios/:folioId/translate/:locale — auto-traduzione LLM ──────────
+  app.post<{ Params: { folioId: string; locale: string } }>('/folios/:folioId/translate/:locale', {
     preHandler: auth,
-  }, async (req: FastifyRequest<{ Params: { postId: string; locale: string } }>, reply: FastifyReply) => {
-    const postId = parseInt(req.params.postId, 10)
-    if (isNaN(postId)) return reply.status(400).send({ error: 'Invalid postId' })
+  }, async (req: FastifyRequest<{ Params: { folioId: string; locale: string } }>, reply: FastifyReply) => {
+    const folioId = parseInt(req.params.folioId, 10)
+    if (isNaN(folioId)) return reply.status(400).send({ error: 'Invalid folioId' })
 
     const locale = req.params.locale
     if (!dbGetLocale(ctx.db, locale)) {
       return reply.status(422).send({ error: `Locale '${locale}' is not registered` })
     }
 
-    const post = getSourcePost(ctx, postId)
-    if (!post) return reply.status(404).send({ error: 'Post not found' })
+    const post = getSourcePost(ctx, folioId)
+    if (!post) return reply.status(404).send({ error: 'Folio not found' })
 
     const config = getTranslatorConfig(ctx)
     if (!config.baseUrl || !config.model) {
@@ -312,12 +312,12 @@ export async function registerI18nRoutes(app: FastifyInstance, ctx: PluginContex
       const fieldDefs = await getFieldDefs(ctx, post.codex)
       const translatedFields = await translateFields(config, post.fields, fieldDefs, locale)
 
-      const existingTranslation = dbGetTranslation(ctx.db, postId, locale)
+      const existingTranslation = dbGetTranslation(ctx.db, folioId, locale)
       const baseSlug  = generateSlug(translatedTitle)
       const finalSlug = ensureUniqueTranslationSlug(ctx.db, locale, baseSlug, existingTranslation?.id)
 
       const row = dbUpsertTranslation(ctx.db, {
-        postId,
+        folioId,
         locale,
         title:   translatedTitle,
         slug:    finalSlug,
@@ -335,15 +335,15 @@ export async function registerI18nRoutes(app: FastifyInstance, ctx: PluginContex
     }
   })
 
-  // ── POST /posts/:postId/translate-all — avvia traduzione asincrona ────────
-  app.post<{ Params: { postId: string } }>('/posts/:postId/translate-all', {
+  // ── POST /folios/:folioId/translate-all — avvia traduzione asincrona ────────
+  app.post<{ Params: { folioId: string } }>('/folios/:folioId/translate-all', {
     preHandler: auth,
-  }, async (req: FastifyRequest<{ Params: { postId: string } }>, reply: FastifyReply) => {
-    const postId = parseInt(req.params.postId, 10)
-    if (isNaN(postId)) return reply.status(400).send({ error: 'Invalid postId' })
+  }, async (req: FastifyRequest<{ Params: { folioId: string } }>, reply: FastifyReply) => {
+    const folioId = parseInt(req.params.folioId, 10)
+    if (isNaN(folioId)) return reply.status(400).send({ error: 'Invalid folioId' })
 
-    const post = getSourcePost(ctx, postId)
-    if (!post) return reply.status(404).send({ error: 'Post not found' })
+    const post = getSourcePost(ctx, folioId)
+    if (!post) return reply.status(404).send({ error: 'Folio not found' })
 
     const config = getTranslatorConfig(ctx)
     if (!config.baseUrl || !config.model || !config.sourceLocale) {
@@ -357,7 +357,7 @@ export async function registerI18nRoutes(app: FastifyInstance, ctx: PluginContex
     jobs.set(jobId, { status: 'running', total: locales.length, completed: 0, failed: 0, createdAt: Date.now() })
 
     // Avvia in background — non blocca la risposta HTTP
-    void runTranslateAll(ctx, jobId, postId, post, config, locales)
+    void runTranslateAll(ctx, jobId, folioId, post, config, locales)
 
     return reply.status(202).send({ jobId, total: locales.length })
   })
@@ -426,13 +426,13 @@ export async function registerI18nRoutes(app: FastifyInstance, ctx: PluginContex
     return { message: result.message }
   })
 
-  // ── GET /public/posts/:postId/:locale — API pubblica (no auth) ───────────
-  app.get<{ Params: { postId: string; locale: string } }>('/public/posts/:postId/:locale', {
-  }, async (req: FastifyRequest<{ Params: { postId: string; locale: string } }>, reply: FastifyReply) => {
-    const postId = parseInt(req.params.postId, 10)
-    if (isNaN(postId)) return reply.status(400).send({ error: 'Invalid postId' })
+  // ── GET /public/folios/:folioId/:locale — API pubblica (no auth) ───────────
+  app.get<{ Params: { folioId: string; locale: string } }>('/public/folios/:folioId/:locale', {
+  }, async (req: FastifyRequest<{ Params: { folioId: string; locale: string } }>, reply: FastifyReply) => {
+    const folioId = parseInt(req.params.folioId, 10)
+    if (isNaN(folioId)) return reply.status(400).send({ error: 'Invalid folioId' })
 
-    const translation = dbGetTranslation(ctx.db, postId, req.params.locale)
+    const translation = dbGetTranslation(ctx.db, folioId, req.params.locale)
     if (!translation) return reply.status(404).send({ error: 'Translation not found' })
     return serializeTranslation(translation)
   })

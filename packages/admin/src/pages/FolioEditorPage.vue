@@ -104,7 +104,7 @@
       <!-- ── Translation-in-progress overlay ── -->
       <Transition name="fade">
         <div
-          v-if="jobStore.activeJob?.postId === postId"
+          v-if="jobStore.activeJob?.folioId === folioId"
           class="absolute inset-0 z-20 flex flex-col items-center justify-center gap-4 bg-surface-900/70 backdrop-blur-sm"
         >
           <i class="pi pi-spinner pi-spin text-4xl text-primary-400" />
@@ -163,7 +163,7 @@
           </Panel>
 
           <Panel v-if="!isNew" header="Revisioni" toggleable>
-            <RevisionsPanel ref="revPanelRef" :codex="type" :post-id="postId!" @restored="onRestored" />
+            <RevisionsPanel ref="revPanelRef" :codex="type" :post-id="folioId!" @restored="onRestored" />
           </Panel>
         </aside>
       </template>
@@ -223,7 +223,7 @@ const confirm = useConfirm()
 
 const type    = computed(() => route.params.codex as string)
 const isNew   = computed(() => route.params.id === undefined)
-const postId  = computed(() => isNew.value ? null : Number(route.params.id))
+const folioId = computed(() => isNew.value ? null : Number(route.params.id))
 
 const codex     = computed(() => appStore.codices.find((c) => c.name === type.value))
 const fieldDefs = computed<FieldDefinition[]>(() => {
@@ -267,9 +267,9 @@ const revPanelRef = ref<InstanceType<typeof RevisionsPanel> | null>(null)
 
 // Carica post esistente
 async function loadPost() {
-  if (isNew.value || !postId.value) return
+  if (isNew.value || !folioId.value) return
   try {
-    const folio = await foliosApi.get(type.value, postId.value)
+    const folio = await foliosApi.get(type.value, folioId.value)
     const f     = folio.fields as Record<string, unknown>
     form.value = {
       title:   String(f.title   ?? ''),
@@ -288,7 +288,7 @@ async function loadPost() {
       ),
     }
   } catch {
-    toast.add({ severity: 'error', summary: 'Errore caricamento post', life: 3000 })
+    toast.add({ severity: 'error', summary: 'Errore caricamento folio', life: 3000 })
   }
 }
 
@@ -314,7 +314,7 @@ async function save(status: 'draft' | 'published') {
       toast.add({ severity: 'success', summary: 'Creato', life: 2000 })
       router.replace(`/folios/${type.value}/${created.id}/edit`)
     } else {
-      await foliosApi.update(type.value, postId.value!, payload)
+      await foliosApi.update(type.value, folioId.value!, payload)
       toast.add({ severity: 'success', summary: 'Salvato', life: 2000 })
       revPanelRef.value?.reload()
     }
@@ -334,7 +334,7 @@ onMounted(async () => {
   await loadI18n()
   // Riprende il polling se c'era un job attivo per questo post al momento del reload/navigazione
   const saved = jobStore.activeJob
-  if (saved && saved.postId === postId.value) {
+  if (saved && saved.folioId === folioId.value) {
     translatingAll.value = true
     startPolling(saved.jobId)
   }
@@ -384,8 +384,8 @@ function startPolling(jobId: string) {
         _translateAllPollTimer = null
         jobStore.clearJob()
         translatingAll.value = false
-        if (postId.value) {
-          translations.value = await i18nApi.listTranslations(postId.value)
+        if (folioId.value) {
+          translations.value = await i18nApi.listTranslations(folioId.value)
         }
         if (job.failed === 0) {
           toast.add({ severity: 'success', summary: 'Traduzione completata', detail: `${job.completed} lingue tradotte`, life: 4000 })
@@ -452,11 +452,11 @@ watchEffect(() => {
 })
 
 async function loadI18n() {
-  if (!appStore.isPluginActive('phrasepress-i18n') || !postId.value) return
+  if (!appStore.isPluginActive('phrasepress-i18n') || !folioId.value) return
   try {
     const [locs, trans] = await Promise.all([
       i18nApi.listLocales(),
-      i18nApi.listTranslations(postId.value),
+      i18nApi.listTranslations(folioId.value),
     ])
     locales.value = locs
     translations.value = trans
@@ -476,14 +476,14 @@ function onTranslationSaved(t: Translation) {
 }
 
 async function saveTranslation(status: 'draft' | 'published') {
-  if (!activeLocale.value || !postId.value) return
+  if (!activeLocale.value || !folioId.value) return
   if (!translationForm.value.title.trim()) {
     toast.add({ severity: 'warn', summary: 'Titolo obbligatorio', life: 3000 })
     return
   }
   savingTranslation.value = true
   try {
-    const saved = await i18nApi.upsertTranslation(postId.value, activeLocale.value, {
+    const saved = await i18nApi.upsertTranslation(folioId.value, activeLocale.value, {
       title:   translationForm.value.title,
       slug:    translationForm.value.slug || undefined,
       content: translationForm.value.content,
@@ -501,10 +501,10 @@ async function saveTranslation(status: 'draft' | 'published') {
 }
 
 async function autoTranslateCurrent() {
-  if (!activeLocale.value || !postId.value) return
+  if (!activeLocale.value || !folioId.value) return
   translatingCurrent.value = true
   try {
-    const t = await i18nApi.autoTranslate(postId.value, activeLocale.value)
+    const t = await i18nApi.autoTranslate(folioId.value, activeLocale.value)
     onTranslationSaved(t)
     translationForm.value = { title: t.title, slug: t.slug, content: t.content, fields: { ...t.fields }, status: t.status }
     toast.add({ severity: 'success', summary: `${currentLocaleLabel.value} tradotta automaticamente`, life: 3000 })
@@ -517,12 +517,12 @@ async function autoTranslateCurrent() {
 }
 
 async function translateAll() {
-  if (!postId.value || locales.value.length === 0) return
+  if (!folioId.value || locales.value.length === 0) return
   translatingAll.value    = true
   translatingLocale.value = null
   try {
-    const { jobId, total } = await i18nApi.startTranslateAll(postId.value)
-    jobStore.startJob(jobId, postId.value, total)
+    const { jobId, total } = await i18nApi.startTranslateAll(folioId.value)
+    jobStore.startJob(jobId, folioId.value, total)
     startPolling(jobId)
   } catch (err: unknown) {
     translatingAll.value = false
@@ -532,9 +532,9 @@ async function translateAll() {
 }
 
 async function deleteCurrentTranslation() {
-  if (!activeLocale.value || !postId.value) return
+  if (!activeLocale.value || !folioId.value) return
   try {
-    await i18nApi.deleteTranslation(postId.value, activeLocale.value)
+    await i18nApi.deleteTranslation(folioId.value, activeLocale.value)
     translations.value = translations.value.filter(t => t.locale !== activeLocale.value)
     translationForm.value = { title: form.value.title, slug: '', content: '', fields: {}, status: 'draft' }
     toast.add({ severity: 'success', summary: 'Traduzione eliminata', life: 3000 })
