@@ -39,3 +39,4 @@ packages/plugins/*/src/*.d.ts.map
 test-sito/
 packages/core/src/db/migrations/meta/.env.backup
 .env.backup
+packages/core/src/api/restart-trigger.ts
