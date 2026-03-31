@@ -108,5 +108,6 @@ export default defineConfig({
     // db-monitor utile in sviluppo
     (await import('../packages/plugins/db-monitor/src/index.js')).default,
     (await import('../packages/plugins/backup/src/index.js')).default,
+    (await import('../packages/plugins/ai/src/index.js')).default,
   ],
 })

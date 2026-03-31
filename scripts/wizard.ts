@@ -238,7 +238,7 @@ async function collectEnvValues(isDev: boolean): Promise<Record<string, string>>
 // phrasepress.config.ts generation
 // ---------------------------------------------------------------------------
 
-const ALL_PLUGINS = ['media', 'fields', 'forms', 'mailer', 'i18n', 'db-monitor'] as const
+const ALL_PLUGINS = ['media', 'fields', 'forms', 'mailer', 'i18n', 'db-monitor', 'ai'] as const
 type PluginName = (typeof ALL_PLUGINS)[number]
 
 const PLUGIN_IMPORT: Record<PluginName, string> = {
@@ -248,14 +248,24 @@ const PLUGIN_IMPORT: Record<PluginName, string> = {
   mailer: `(await import('../packages/plugins/mailer/src/index.js')).default`,
   i18n: `(await import('../packages/plugins/i18n/src/index.js')).default`,
   'db-monitor': `(await import('../packages/plugins/db-monitor/src/index.js')).default`,
+  ai: `(await import('../packages/plugins/ai/src/index.js')).default`,
 }
 
-async function configurePluginsAndTypes(): Promise<void> {
+async function configurePluginsAndTypes(): Promise<PluginName[]> {
   printSection('Plugins, Codici & Vocabolari')
 
   // Plugin selection
   print('  Plugin disponibili:')
-  ALL_PLUGINS.forEach((p, i) => print(`    ${cyan(String(i + 1))}. ${p}`))
+  const PLUGIN_DESCRIPTIONS: Record<PluginName, string> = {
+    media:        'Gestione media e upload file',
+    fields:       'Tipi di campo avanzati',
+    forms:        'Form builder con validazione',
+    mailer:       'Invio email transazionali',
+    i18n:         'Supporto multilingua',
+    'db-monitor': 'Monitor query e performance DB',
+    ai:           'Chat AI integrata nell\'admin con tool per gestire contenuti',
+  }
+  ALL_PLUGINS.forEach((p, i) => print(`    ${cyan(String(i + 1))}. ${p}  ${dim(PLUGIN_DESCRIPTIONS[p])}`))
   print('')
   const pluginAnswer = await ask('Abilita plugin (numeri separati da virgola, "all" o "none")', 'all')
 
@@ -377,6 +387,7 @@ ${pluginImports}
   await backupConfigIfExists()
   await fs.writeFile(CONFIG_FILE, configContent, 'utf8')
   print(green(`  ✓  phrasepress.config.ts aggiornato`))
+  return selectedPlugins
 }
 
 // ---------------------------------------------------------------------------
@@ -684,12 +695,29 @@ async function main() {
   // ── phrasepress.config.ts (optional) ─────────────────────────────────────
   print('')
   const configureTs = await askYesNo('Configurare plugin, codici e vocabolari in phrasepress.config.ts?', false)
+  let selectedPlugins: PluginName[] = []
   if (configureTs) {
-    await configurePluginsAndTypes()
+    selectedPlugins = await configurePluginsAndTypes()
   }
 
   // ── Setup actions ─────────────────────────────────────────────────────────
   await runSetupActions(isDev)
+
+  // ── AI plugin hint ────────────────────────────────────────────────────────
+  if (selectedPlugins.includes('ai')) {
+    print('')
+    printSection('Plugin AI — configurazione')
+    print(`  Il plugin ${cyan('phrasepress-ai')} è stato abilitato.`)
+    print(`  Per attivarlo e configurarlo:`)
+    print(`    ${dim('1.')} Apri l'admin UI → sezione ${bold('Plugin')} → attiva ${cyan('phrasepress-ai')}`)
+    print(`    ${dim('2.')} Vai su ${bold('Impostazioni AI')} e configura:`)
+    print(`       ${dim('•')} Provider (Ollama / OpenAI / Anthropic)`)
+    print(`       ${dim('•')} Modello e URL base (es. http://localhost:11434 per Ollama)`)
+    print(`       ${dim('•')} Percorsi autorizzati per i file tool (opzionale)`)
+    print(`    ${dim('3.')} Clicca l'icona ${bold('✦')} in basso a destra per aprire la chat`)
+    print('')
+    print(dim('  Documentazione Ollama: https://ollama.com/library'))
+  }
 
   // ── Launch ────────────────────────────────────────────────────────────────
   rl.close()
