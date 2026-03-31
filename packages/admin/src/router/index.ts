@@ -146,6 +146,12 @@ const router = createRouter({
           component: () => import('@/pages/BackupPage.vue'),
           meta: { requireCapability: 'manage_options', requirePlugin: 'phrasepress-backup' },
         },
+        {
+          path: 'ai-settings',
+          name: 'ai-settings',
+          component: () => import('@/pages/AiSettingsPage.vue'),
+          meta: { requireCapability: 'manage_plugins', requirePlugin: 'phrasepress-ai' },
+        },
       ],
     },
     {

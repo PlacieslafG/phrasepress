@@ -180,6 +180,18 @@
               </a>
             </RouterLink>
 
+            <RouterLink
+              v-if="appStore.isPluginActive('phrasepress-ai')"
+              to="/ai-settings"
+              v-slot="{ navigate, isActive }"
+              custom
+            >
+              <a @click="navigate" :class="navClass(isActive)">
+                <i class="pi pi-sparkles text-sm shrink-0" />
+                <span>AI</span>
+              </a>
+            </RouterLink>
+
             <RouterLink to="/api-tester" v-slot="{ navigate, isActive }" custom>
               <a @click="navigate" :class="navClass(isActive)">
                 <i class="pi pi-code text-sm shrink-0" />
@@ -201,7 +213,10 @@
       </aside>
 
       <!-- Contenuto principale -->
-      <main class="flex-1 overflow-y-auto">
+      <main
+        class="flex-1 overflow-y-auto transition-[margin-right] duration-200"
+        :style="aiStore.isOpen && aiStore.isExpanded ? { marginRight: aiStore.panelWidth + 'px' } : {}"
+      >
         <RouterView />
       </main>
     </div>
@@ -213,10 +228,12 @@ import { ref } from 'vue'
 import { useAuthStore } from '@/stores/auth.js'
 import { useAppStore } from '@/stores/app.js'
 import { useThemeStore } from '@/stores/theme.js'
+import { useAiStore } from '@/stores/ai.js'
 
-const authStore = useAuthStore()
-const appStore  = useAppStore()
+const authStore  = useAuthStore()
+const appStore   = useAppStore()
 const themeStore = useThemeStore()
+const aiStore    = useAiStore()
 const sidebarOpen = ref(true)
 
 function navClass(active: boolean): string {

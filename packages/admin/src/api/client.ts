@@ -110,6 +110,12 @@ export async function apiFetch<T>(path: string, options: RequestInit = {}): Prom
   return response.json() as Promise<T>
 }
 
+/** Ritorna gli header di autenticazione per fetch manuali (es. stream SSE). */
+export function getAuthHeaders(): Record<string, string> {
+  const token = _getToken()
+  return token ? { Authorization: `Bearer ${token}` } : {}
+}
+
 // Authenticated fetch that returns a Blob (for file downloads)
 export async function apiFetchBlob(path: string): Promise<Blob> {
   const token = _getToken()
