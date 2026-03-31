@@ -1,0 +1,21 @@
+{
+  "name": "@phrasepress/plugin-ai",
+  "version": "0.1.0",
+  "description": "Copilot-like AI chat plugin for PhrasePress",
+  "type": "module",
+  "main": "./src/index.ts",
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@phrasepress/core": "workspace:*",
+    "openai": "^4.89.0",
+    "@anthropic-ai/sdk": "^0.39.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "drizzle-orm": "^0.40.1",
+    "fastify": "^5.2.1",
+    "typescript": "^5.7.3"
+  }
+}
